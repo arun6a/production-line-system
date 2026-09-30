@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a" id="themeColorMeta">
+  <title>KM Wire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="capacitor.js" onerror="console.log('Browser mode')"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+    :root {
+      --bg:#0f172a; --bg-card:#1e293b; --bg-input:#334155;
+      --orange:#f97316; --orange-dim:rgba(249,115,22,0.15);
+      --accent:#3b82f6; --success:#22c55e; --danger:#ef4444;
+      --text:#f1f5f9; --text-sub:#94a3b8; --border:rgba(255,255,255,0.08);
+      --nav-h:64px; --ripple:rgba(249,115,22,0.25);
+    }
+    html, body { height:100%; overflow:hidden; background:var(--bg); font-family:'Roboto',sans-serif; color:var(--text); }
+    body { display:flex; flex-direction:column; padding-bottom:env(safe-area-inset-bottom); }
+
+    /* Loading */
+    #loadingScreen { position:fixed; inset:0; background:#0f172a; z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; transition:opacity 0.5s ease; }
+    #loadingScreen.fade-out { opacity:0; pointer-events:none; }
+    .load-icon { width:72px; height:72px; background:var(--orange); border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:900; color:white; letter-spacing:-1px; box-shadow:0 8px 32px rgba(249,115,22,0.4); animation:loadPulse 1.5s ease-in-out infinite; }
+    @keyframes loadPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.05);} }
+    .load-title { font-size:1.5rem; font-weight:700; color:white; }
+    .load-title span { color:var(--orange); }
+    .load-bar-wrap { width:140px; height:3px; background:rgba(255,255,255,0.1); border-radius:99px; overflow:hidden; }
+    .load-bar { height:100%; background:linear-gradient(90deg,var(--orange),#f59e0b); border-radius:99px; animation:loadBar 1.8s ease-out forwards; }
+    @keyframes loadBar { 0%{width:0%} 60%{width:80%} 100%{width:100%} }
+    .load-sub { font-size:0.72rem; color:rgba(255,255,255,0.35); letter-spacing:0.1em; text-transform:uppercase; }
+    .load-status { font-size:0.75rem; color:rgba(255,255,255,0.5); }
+    .voice-btn { background:rgba(249,115,22,0.12); color:#f97316; border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:0.25rem 0.6rem; font-size:0.72rem; cursor:pointer; font-weight:600; font-family:'Roboto',sans-serif; transition:all 0.2s; }
+    .voice-btn.listening { background:rgba(239,68,68,0.15); color:#ef4444; border-color:#ef4444; animation:pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+    .res-label-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem; }
+    .voice-btns { display:flex; gap:0.3rem; }
+
+    /* Header */
+    .app-header { height:56px; background:var(--bg-card); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 1rem; padding-top:env(safe-area-inset-top); flex-shrink:0; z-index:100; }
+    .header-logo { display:flex; align-items:center; gap:0.6rem; }
+    .header-logo-icon { width:32px; height:32px; background:var(--orange); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:900; color:white; letter-spacing:-0.5px; }
+    .header-title { font-size:1.1rem; font-weight:700; }
+    .header-title span { color:var(--orange); }
+    .header-actions { display:flex; align-items:center; gap:0.5rem; }
+    .header-icon-btn { background:none; border:none; color:var(--text-sub); cursor:pointer; padding:0.4rem; border-radius:8px; display:flex; align-items:center; }
+
+    /* Bottom nav */
+    .bottom-nav { position:fixed !important; bottom:0; left:0; right:0; height:calc(var(--nav-h) + env(safe-area-inset-bottom)); background:var(--bg-card); border-top:1px solid var(--border); display:flex !important; z-index:1000 !important; padding-bottom:env(safe-area-inset-bottom); }
+    .nav-tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; background:none; border:none; color:var(--text-sub); cursor:pointer; font-family:'Roboto',sans-serif; font-size:0.7rem; font-weight:500; position:relative; overflow:hidden; transition:color 0.2s; }
+    .nav-tab.active { color:var(--orange); }
+    .nav-tab i { width:22px; height:22px; }
+    .nav-badge { position:absolute; top:6px; right:calc(50% - 18px); background:var(--danger); color:white; font-size:0.55rem; font-weight:700; padding:1px 4px; border-radius:99px; min-width:16px; text-align:center; }
+
+    /* Ripple */
+    .ripple-host { position:relative; overflow:hidden; }
+    .ripple-circle { position:absolute; border-radius:50%; background:var(--ripple); transform:scale(0); animation:ripple 0.5s ease-out forwards; pointer-events:none; }
+    @keyframes ripple { to { transform:scale(2.5); opacity:0; } }
+
+    /* Views */
+    #app-body { flex:1; overflow:hidden; position:relative; margin-bottom:var(--nav-h); }
+    .view { position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; display:none; overscroll-behavior:contain; }
+    .view.active { display:block; }
+
+    /* Chips */
+    #view-service { background:#f2f2f7; }
+    .chips { display:flex; gap:0.4rem; overflow-x:auto; padding:0.5rem 1rem; scrollbar-width:none; }
+    .chips::-webkit-scrollbar { display:none; }
+    .chip { flex-shrink:0; padding:0.35rem 0.85rem; border-radius:99px; border:1px solid #e5e5ea; background:#ffffff; color:#6c6c70; font-size:0.78rem; font-weight:500; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+    .chip.active { background:var(--orange-dim); border-color:var(--orange); color:var(--orange); font-weight:700; }
+
+    /* Status Pills */
+    .pill { display:inline-flex; align-items:center; padding:0.2rem 0.6rem; border-radius:99px; font-size:0.68rem; font-weight:700; }
+    .pill-received { background:rgba(59,130,246,0.15); color:#3b82f6; }
+    .pill-repair { background:rgba(249,115,22,0.15); color:#f97316; }
+    .pill-ready { background:rgba(34,197,94,0.15); color:#22c55e; }
+    .pill-delivered { background:rgba(100,116,139,0.15); color:#64748b; }
+    .pill-closed { background:rgba(71,85,105,0.15); color:#475569; }
+
+    /* Service Cards */
+    .service-card { background:#ffffff; border-radius:16px; border:1px solid #e5e5ea; margin:0 1rem 0.75rem; overflow:hidden; cursor:pointer; transition:transform 0.15s; position:relative; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+    .service-card:active { transform:scale(0.98); }
+    .card-accent { position:absolute; left:0; top:0; bottom:0; width:3px; }
+    .card-body { padding:0.875rem 0.875rem 0.875rem 1rem; }
+    .card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem; }
+    .card-id { font-size:0.72rem; font-weight:700; color:#8e8e93; }
+    .card-machine { font-size:0.9rem; font-weight:600; margin-bottom:0.2rem; color:#1c1c1e; }
+    .card-problem { font-size:0.78rem; color:#6c6c70; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .card-footer { display:flex; align-items:center; justify-content:space-between; margin-top:0.6rem; }
+    .card-phone { font-size:0.72rem; color:#8e8e93; }
+    .card-age { font-size:0.65rem; color:#8e8e93; }
+    .card-quick-btns { display:flex; gap:0.3rem; flex-wrap:wrap; padding:0.5rem 0.875rem 0.75rem 1rem; border-top:1px solid #f2f2f7; }
+    .quick-btn { padding:0.3rem 0.7rem; border-radius:8px; font-size:0.72rem; font-weight:600; cursor:pointer; border:1px solid #e5e5ea; background:#f2f2f7; color:#3c3c43; font-family:'Roboto',sans-serif; }
+    .quick-btn.q-repair { border-color:#f97316; background:rgba(249,115,22,0.1); color:#f97316; }
+    .quick-btn.q-ready { border-color:#22c55e; background:rgba(34,197,94,0.1); color:#22c55e; }
+
+    /* Detail Sheet */
+    #detailSheet { position:fixed; inset:0; z-index:2000; display:none; }
+    #detailSheet.active { display:block; }
+    #detailSheetBg { position:absolute; inset:0; background:rgba(0,0,0,0.6); }
+    #detailSheetContent { position:absolute; bottom:0; left:0; right:0; background:#ffffff; border-radius:24px 24px 0 0; max-height:92vh; overflow-y:auto; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); padding-bottom:calc(1.5rem + env(safe-area-inset-bottom)); z-index:1; }
+    #detailSheet.active #detailSheetContent { transform:translateY(0); }
+    .sheet-handle { width:36px; height:4px; background:#e5e5ea; border-radius:99px; margin:0.75rem auto 0; }
+    .sheet-header { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.25rem 0.5rem; }
+    .sheet-title { font-size:1rem; font-weight:700; color:#1c1c1e; }
+    .sheet-close { background:#f2f2f7; border:none; color:#6c6c70; cursor:pointer; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+    .sheet-body { padding:0 1.25rem; }
+    .detail-row { display:flex; flex-direction:column; gap:0.2rem; padding:0.6rem 0; border-bottom:1px solid #f2f2f7; }
+    .detail-row:last-child { border-bottom:none; }
+    .detail-label { font-size:0.68rem; font-weight:700; color:#8e8e93; text-transform:uppercase; letter-spacing:0.06em; }
+    .detail-value { font-size:0.9rem; color:#1c1c1e; line-height:1.4; }
+    .status-actions { display:flex; gap:0.5rem; flex-wrap:wrap; margin:1rem 0; }
+    .status-btn { flex:1; min-width:100px; padding:0.75rem; border-radius:12px; border:none; font-size:0.85rem; font-weight:700; cursor:pointer; font-family:'Roboto',sans-serif; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:0.4rem; }
+    .status-btn:active { transform:scale(0.97); }
+    .status-btn-repair { background:rgba(249,115,22,0.15); color:#f97316; border:1.5px solid #f97316; }
+    .status-btn-ready { background:rgba(34,197,94,0.15); color:#22c55e; border:1.5px solid #22c55e; }
+    .resolution-section { margin:0.75rem 0; }
+    .res-label { font-size:0.72rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.4rem; display:block; }
+    .res-textarea { width:100%; background:#f9f9fb; border:1px solid #e5e5ea; border-radius:12px; color:#1c1c1e; font-size:0.88rem; padding:0.75rem; font-family:'Roboto',sans-serif; resize:none; min-height:80px; outline:none; }
+    .res-textarea:focus { border-color:var(--orange); }
+    .media-row { display:flex; flex-direction:column; gap:0.5rem; margin:0.75rem 0; }
+    .media-box { width:100%; background:#f9f9fb; border-radius:12px; border:1.5px dashed #e5e5ea; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.3rem; cursor:pointer; overflow:hidden; position:relative; font-size:0.65rem; color:#6c6c70; min-height:80px; }
+    .media-box img { width:100%; max-height:200px; object-fit:cover; border-radius:10px; cursor:zoom-in; }
+    .media-box.uploadable { border-color:var(--orange); }
+    .media-box.uploadable { border-color:var(--orange); }
+    .media-upload-opts { display:flex; gap:0.3rem; flex-wrap:wrap; justify-content:center; padding:0.5rem 0.25rem; }
+    .media-upload-btn { padding:0.28rem 0.55rem; border-radius:6px; font-size:0.7rem; font-weight:600; cursor:pointer; border:1px solid var(--orange); background:rgba(249,115,22,0.1); color:var(--orange); font-family:'Roboto',sans-serif; white-space:nowrap; }
+    .media-upload-btn.audio { border-color:#a855f7; background:rgba(168,85,247,0.12); color:#a855f7; }
+    .slot2-cancel { display:none; width:100%; margin-top:0.3rem; padding:0.25rem; border-radius:8px; border:1px solid #ef4444; background:rgba(239,68,68,0.08); color:#ef4444; font-size:0.68rem; font-weight:700; cursor:pointer; font-family:'Roboto',sans-serif; text-align:center; }
+    .svc-upload-progress { display:none; width:100%; margin-top:0.4rem; }
+    .svc-upload-progress-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem; }
+    .svc-upload-progress-label { font-size:0.72rem; color:#1c1c1e; font-weight:600; }
+    .svc-upload-progress-pct { font-size:0.72rem; color:var(--orange); font-weight:700; }
+    .svc-upload-progress-track { width:100%; height:6px; background:#e5e5ea; border-radius:99px; overflow:hidden; }
+    .svc-upload-progress-fill { height:100%; background:linear-gradient(90deg,var(--orange),#f59e0b); border-radius:99px; width:0%; transition:width 0.2s; }
+    .upload-progress { display:none; width:100%; padding:0.5rem 0; }
+    .upload-progress-bar { width:100%; height:4px; background:#e5e5ea; border-radius:99px; overflow:hidden; }
+    .upload-progress-fill { height:100%; background:linear-gradient(90deg,var(--orange),#f59e0b); border-radius:99px; animation:uploadAnim 1.5s ease-in-out infinite; }
+    @keyframes uploadAnim { 0%{width:10%} 50%{width:80%} 100%{width:95%} }
+    .upload-progress-text { font-size:0.65rem; color:#8e8e93; text-align:center; margin-top:0.25rem; font-weight:600; }
+    .audio-rec-ui { display:none; text-align:center; padding:0.4rem; background:rgba(168,85,247,0.1); border-radius:10px; margin-top:0.3rem; }
+    .audio-rec-ui.active { display:block; }
+    .save-btn { width:100%; background:var(--orange); color:white; border:none; border-radius:14px; padding:0.9rem; font-size:0.95rem; font-weight:700; cursor:pointer; font-family:'Roboto',sans-serif; margin-top:0.75rem; transition:all 0.2s; }
+    .save-btn:active { transform:scale(0.98); }
+    .save-btn:disabled { background:var(--bg-input); color:var(--text-sub); cursor:not-allowed; }
+
+    /* Toast */
+    #toast { position:fixed; bottom:calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%) translateY(20px); background:#1e293b; color:var(--text); padding:0.6rem 1.2rem; border-radius:99px; font-size:0.82rem; font-weight:500; z-index:9999; opacity:0; transition:all 0.3s; white-space:nowrap; border:1px solid var(--border); box-shadow:0 4px 20px rgba(0,0,0,0.4); }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* Empty state */
+    .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 2rem; gap:0.75rem; opacity:0.5; }
+    .empty-state-icon { font-size:2.5rem; }
+    .empty-state-text { font-size:0.88rem; color:var(--text-sub); text-align:center; }
+
+    /* Lightbox */
+    #lightbox { position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:9000; display:none; align-items:center; justify-content:center; }
+    #lightbox.active { display:flex; }
+    #lightbox img { max-width:95%; max-height:95%; border-radius:8px; object-fit:contain; }
+
+    /* Notif banner */
+    #notifBanner { background:rgba(249,115,22,0.1); border:1px solid var(--orange); border-radius:12px; margin:0.75rem 1rem 0; padding:0.75rem 1rem; display:none; align-items:center; justify-content:space-between; gap:0.5rem; }
+    #notifBanner.show { display:flex; }
+    .notif-banner-text { font-size:0.78rem; color:var(--text); flex:1; }
+    .notif-banner-btn { background:var(--orange); color:white; border:none; border-radius:8px; padding:0.4rem 0.75rem; font-size:0.75rem; font-weight:700; cursor:pointer; white-space:nowrap; font-family:'Roboto',sans-serif; }
+
+    /* ── WIRING — LIGHT THEME ─────────────────────────────────── */
+    #view-wiring { display:none; flex-direction:column; height:100%; padding:0; overflow:hidden; }
+    #view-wiring.active { display:flex; }
+    .wiring-camera { height:42vh; flex-shrink:0; background:#000; position:relative; }
+    #wr-reader { width:100%; height:100%; }
+    #wr-reader video { width:100% !important; height:100% !important; object-fit:cover !important; }
+    #wr-reader__dashboard { display:none !important; }
+    .scan-overlay { display:none; }
+    .wiring-body { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; background:#f2f2f7; padding-bottom:1rem; }
+    .wr-card { background:#ffffff; border-radius:20px; margin:0.75rem; border:1px solid #e5e5ea; padding:1rem; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+    .wr-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
+    .wr-sync-info { font-size:0.68rem; font-weight:700; color:#8e8e93; text-transform:uppercase; }
+    .wr-actions { display:flex; gap:0.4rem; }
+    .wr-icon-btn { background:#f2f2f7; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#3c3c43; font-size:0.85rem; }
+    .wr-icon-btn.on { background:rgba(249,115,22,0.15); color:var(--orange); }
+    .wr-pending { background:#ff9500; color:white; font-size:0.6rem; font-weight:700; padding:2px 6px; border-radius:6px; display:none; }
+    .wr-dup-warn { display:none; color:#ff3b30; text-align:center; font-weight:700; font-size:0.75rem; margin-bottom:0.5rem; background:rgba(255,59,48,0.1); padding:0.4rem; border-radius:8px; }
+    .wr-field { margin-bottom:0.75rem; }
+    .wr-label { display:block; font-size:0.65rem; font-weight:700; color:#8e8e93; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.4rem; }
+    .wr-input { width:100%; background:#f9f9fb; border:1px solid #e5e5ea; border-radius:12px; color:#1c1c1e; font-size:1rem; padding:0.75rem 1rem; font-family:'Roboto',sans-serif; outline:none; }
+    .wr-input:focus { border-color:var(--orange); }
+    .wr-input[type="date"]::-webkit-calendar-picker-indicator { filter:none; }
+    .machine-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.4rem; }
+    .m-btn { padding:0.65rem 0.25rem; border-radius:10px; border:1.5px solid #e5e5ea; background:#ffffff; color:#3c3c43; font-size:0.78rem; font-weight:700; cursor:pointer; text-align:center; font-family:'Roboto',sans-serif; transition:all 0.15s; }
+    .m-btn.active { border-color:var(--orange); background:rgba(249,115,22,0.1); color:var(--orange); }
+    .m-btn:active { transform:scale(0.95); }
+    .wr-submit { width:100%; background:var(--orange); color:white; border:none; border-radius:14px; padding:0.9rem; font-size:0.95rem; font-weight:700; cursor:pointer; font-family:'Roboto',sans-serif; margin-top:0.5rem; transition:all 0.2s; }
+    .wr-submit:disabled { background:#aeaeb2; cursor:not-allowed; }
+    .wr-submit:active:not(:disabled) { transform:scale(0.98); }
+
+    /* Wiring History Modal - light */
+    #wr-history-modal { position:fixed; inset:0; background:#f2f2f7; z-index:3000; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; }
+    #wr-history-modal.open { transform:translateY(0); }
+    .wr-modal-header { background:#ffffff; padding:1rem 1.25rem; border-bottom:1px solid #e5e5ea; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+    .wr-modal-title { font-size:1.05rem; font-weight:700; color:#1c1c1e; }
+    .wr-modal-close { font-size:1.5rem; color:var(--orange); background:none; border:none; cursor:pointer; }
+    .wr-modal-body { flex:1; overflow-y:auto; padding:1rem; }
+    .goal-card { background:#ffffff; border-radius:14px; padding:1rem; margin-bottom:1rem; border:1px solid #e5e5ea; }
+    .goal-title { font-size:0.68rem; font-weight:700; color:#8e8e93; text-transform:uppercase; margin-bottom:0.6rem; }
+    .goal-bar-bg { width:100%; height:8px; background:#e5e5ea; border-radius:4px; overflow:hidden; }
+    .goal-bar-fill { height:100%; background:linear-gradient(90deg,var(--orange),#22c55e); border-radius:4px; transition:width 0.5s; }
+    .goal-text { margin-top:0.4rem; font-size:0.78rem; font-weight:700; display:flex; justify-content:space-between; color:#1c1c1e; }
+    .wr-hist-item { display:flex; justify-content:space-between; padding:0.65rem 0; border-bottom:1px solid #f2f2f7; font-size:0.82rem; color:#1c1c1e; }
+    .wr-hist-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen">
+    <div class="load-icon">KM</div>
+    <div class="load-title">KM <span>Wire</span></div>
+    <div class="load-bar-wrap"><div class="load-bar"></div></div>
+    <div class="load-sub">Kutty Machines</div>
+    <div class="load-status" id="loadStatus">Syncing data...</div>
+  </div>
+
+  <div id="lightbox" onclick="closeLightbox()"><img id="lightboxImg" src=""></div>
+  <div id="toast"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <div class="header-logo-icon">KM</div>
+      <div class="header-title">KM <span>Wire</span></div>
+    </div>
+    <div class="header-actions">
+      <span id="connDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:0.25rem;"></span>
+      <!-- Service header actions -->
+      <div id="headerService" style="display:none;">
+        <button class="header-icon-btn" onclick="refreshCurrentView()">
+          <i data-lucide="refresh-cw" id="refreshIcon" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+      <!-- Wiring header actions -->
+      <div id="headerWiring" style="display:flex;align-items:center;gap:0.25rem;">
+        <span id="wr-sync-time-h" style="font-size:0.6rem;color:var(--text-sub);font-weight:700;text-transform:uppercase;">—</span>
+        <button id="wr-zoom-btn" class="wr-icon-btn" onclick="wrToggleZoom()" style="width:30px;height:30px;font-size:0.75rem;">1x</button>
+        <button id="wr-flash-btn" class="wr-icon-btn" onclick="wrToggleFlash()" style="width:30px;height:30px;font-size:0.8rem;">🔦</button>
+        <button class="wr-icon-btn" onclick="wrRunSync()" id="wr-sync-btn" style="width:30px;height:30px;font-size:0.8rem;">🔄</button>
+        <button class="wr-icon-btn" onclick="wrToggleHistory()" style="width:30px;height:30px;font-size:0.8rem;">📜</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="app-body">
+
+    <!-- SERVICE VIEW -->
+    <div id="view-service" class="view">
+      <div id="notifBanner">
+        <div class="notif-banner-text">🔔 Enable notifications for new in-house jobs</div>
+        <button class="notif-banner-btn" onclick="requestNotifPermission()">Enable</button>
+      </div>
+      <div class="chips">
+        <div class="chip active" data-filter="all" onclick="selectChip(this)">All</div>
+        <div class="chip" data-filter="Received" onclick="selectChip(this)">📥 Received</div>
+        <div class="chip" data-filter="Under Repair" onclick="selectChip(this)">🔧 Under Repair</div>
+        <div class="chip" data-filter="Ready" onclick="selectChip(this)">✅ Ready</div>
+        <div class="chip" data-filter="history" onclick="selectChip(this)">📦 History</div>
+      </div>
+      <div id="serviceList">
+        <div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-text">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- WIRING VIEW -->
+    <div id="view-wiring" class="view active">
+      <div class="wiring-camera">
+        <div id="wr-reader"></div>
+      </div>
+      <div class="wiring-body">
+        <div class="wr-card">
+          <div class="wr-topbar">
+            <span id="wr-pending-tag" class="wr-pending">0 PENDING</span>
+          </div>
+          <div id="wr-dup-warn" class="wr-dup-warn">⚠️ DUPLICATE SERIAL NUMBER</div>
+          <div class="wr-field">
+            <label class="wr-label">Date</label>
+            <input type="date" id="wr-date" class="wr-input">
+          </div>
+          <div class="wr-field">
+            <label class="wr-label">Serial Number</label>
+            <input type="text" id="wr-serial" class="wr-input" placeholder="Scan or type..." oninput="wrHandleSerial()">
+          </div>
+          <div class="wr-field">
+            <label class="wr-label">Machine Type</label>
+            <div class="machine-grid" id="wr-machine-buttons">
+              <!-- Hardcoded fallback buttons — replaced dynamically if wrFetchMachines() succeeds -->
+              <button class="m-btn" onclick="wrSelectMachine('CIDM')">CIDM</button>
+              <button class="m-btn" onclick="wrSelectMachine('CSEM')">CSEM</button>
+              <button class="m-btn" onclick="wrSelectMachine('CSIM')">CSIM</button>
+              <button class="m-btn" onclick="wrSelectMachine('CCBM')">CCBM</button>
+              <button class="m-btn" onclick="wrSelectMachine('CIDM110')">CIDM110</button>
+              <button class="m-btn" onclick="wrSelectMachine('')">Clear</button>
+            </div>
+          </div>
+          <button class="wr-submit" id="wr-submit-btn" onclick="wrSubmit()" disabled>SUBMIT WIRING</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-tab ripple-host" id="navServiceBtn" onclick="switchTab('service', this)">
+      <i data-lucide="wrench"></i>
+      <span id="serviceBadge" class="nav-badge" style="display:none;"></span>
+      <span>Service</span>
+    </button>
+    <button class="nav-tab ripple-host active" id="navWiringBtn" onclick="switchTab('wiring', this)">
+      <i data-lucide="zap"></i>
+      <span>Wiring</span>
+    </button>
+  </nav>
+
+  <!-- Detail Sheet -->
+  <div id="detailSheet">
+    <div id="detailSheetBg" onclick="closeDetail()"></div>
+    <div id="detailSheetContent" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title" id="sheetTitle">Detail</div>
+        <button class="sheet-close" onclick="closeDetail()">✕</button>
+      </div>
+      <!-- Static file inputs — always in DOM, same as main app -->
+      <input type="file" id="svcS2Img" accept="image/*" style="display:none;" onchange="svcHandleImgUpload(this)">
+      <input type="file" id="svcS2Cam" accept="image/*" capture="environment" style="display:none;" onchange="svcHandleImgUpload(this)">
+      <input type="file" id="svcS2Vid" accept="video/*" style="display:none;" onchange="svcHandleVidUpload(this)">
+      <input type="file" id="svcS2VidR" accept="video/*" capture="environment" style="display:none;" onchange="svcHandleVidUpload(this)">
+      <div class="sheet-body" id="sheetBody"></div>
+    </div>
+  </div>
+
+  <!-- Wiring History Modal -->
+  <div id="wr-history-modal">
+    <div class="wr-modal-header">
+      <span class="wr-modal-title">⚡ Wiring History</span>
+      <button class="wr-modal-close" onclick="wrToggleHistory()">×</button>
+    </div>
+    <div class="wr-modal-body">
+      <div class="goal-card">
+        <div class="goal-title">Weekly Wiring Progress</div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill" id="wr-goal-fill" style="width:0%"></div></div>
+        <div class="goal-text"><span id="wr-goal-current">0</span><span>Target: 35</span></div>
+      </div>
+      <div id="wr-history-list"></div>
+    </div>
+  </div>
+
+
+
+  <script>
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  const SVC_API = 'https://script.google.com/macros/s/AKfycbyUrhQM_7tip-hihlTKsna34TcmWRscxvEVKfJeajrRQDJbsUZWhFJyf6rIfjFHrhDUZg/exec';
+  const TG_TOKEN = '7801890257:AAGnOw2gbplPToKKJLLtwzDz6SHj2GLkCb4';
+  const TG_CHAT = '8341470050';
+  const WIRING_CSV_URL = 'https://docs.google.com/spreadsheets/d/19y16Nu7GdYPN0DdTZId2bfoBn4jSmV5ZVHXSkdDdcRY/export?format=csv';
+  // === NEW CONSOLIDATED URL ===
+  // Single URL for all actions. The ?action= parameter tells the script what to do.
+  const WIRING_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxhC68ObyS_Z3swzMh0NjWgd9Qs2W3pOGu2HKjQRA5LIfXH_LHx_mEDyYFnCo-OxwNe/exec?action=logWiring';
+  const MACHINES_URL = 'https://script.google.com/macros/s/AKfycbxhC68ObyS_Z3swzMh0NjWgd9Qs2W3pOGu2HKjQRA5LIfXH_LHx_mEDyYFnCo-OxwNe/exec?action=readMachines';
+  const WR_LS_HIST = 'wiring_history';
+  const WR_LS_TIME = 'wiring_sync_time';
+  
+  // === HARDCODED FALLBACK === — used only if wrFetchMachines() fails
+  const FALLBACK_MODELS = ['CIDM', 'CSEM', 'CSIM', 'CCBM', 'CIDM110'];
+  let ACTIVE_MODELS = [...FALLBACK_MODELS];
+
+  // ── WIRING STATE (isolated) ───────────────────────────────────────────────
+  let wrPendingQueue = JSON.parse(localStorage.getItem('wiring_pending') || '[]');
+  let wrSelectedMachine = '';
+  let wrHtml5QrCode = null;
+  let wrTorchOn = false;
+  let wrZoomed = false;
+
+  // ── SERVICE STATE (isolated) ──────────────────────────────────────────────
+  let svcComplaints = [];
+  let svcFilter = 'all';
+  let svcCurrentId = null;
+  let svcPollInterval = null;
+  let svcPrevIds = new Set(JSON.parse(localStorage.getItem('svc_known_ids') || '[]'));
+  let svcInstallTime = parseInt(localStorage.getItem('svc_install_time') || '0');
+  if (!svcInstallTime) { svcInstallTime = Date.now(); localStorage.setItem('svc_install_time', svcInstallTime); }
+  let _svcAudioRecorder = null;
+  let _svcAudioChunks = [];
+  let _svcAudioTimer = null;
+  let _svcAudioSecs = 0;
+  let _svcSlot2Data = null;
+  let currentTab = 'wiring';
+
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+    wrInitDate();
+    checkNotifPermission();
+    updateConnDot();
+    window.addEventListener('online', updateConnDot);
+    window.addEventListener('offline', updateConnDot);
+
+    // Hide loading after 1.8s same as original
+    setTimeout(hideLoading, 1800);
+
+    // Start scanner
+    wrStartScanner();
+
+    // Load data in background
+    svcLoad();
+    wrFetchMachines();  // NEW — fetch machine list from registry
+    wrRunSync();
+    svcStartPolling();
+
+    if (window.location.hash === '#service') {
+      switchTab('service', document.getElementById('navServiceBtn'));
+    }
+  });
+
+  function setLoadStatus(msg) {
+    const el = document.getElementById('loadStatus');
+    if (el) el.textContent = msg;
+  }
+
+  function hideLoading() {
+    const ls = document.getElementById('loadingScreen');
+    if (ls) { ls.classList.add('fade-out'); setTimeout(() => ls.remove(), 600); }
+  }
+
+  function updateConnDot() {
+    const dot = document.getElementById('connDot');
+    if (dot) dot.style.background = navigator.onLine ? '#22c55e' : '#ef4444';
+  }
+
+  // ── TAB SWITCHING ─────────────────────────────────────────────────────────
+  function switchTab(tab, btn) {
+    currentTab = tab;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + tab).classList.add('active');
+    btn.classList.add('active');
+    // Show/hide header action groups
+    var hw = document.getElementById('headerWiring');
+    var hs = document.getElementById('headerService');
+    if (hw) hw.style.display = tab === 'wiring' ? 'flex' : 'none';
+    if (hs) hs.style.display = tab === 'service' ? 'flex' : 'none';
+    if (tab === 'wiring') {
+      if (!wrHtml5QrCode) wrStartScanner();
+    } else {
+      // Stop scanner and release ALL camera/mic tracks
+      if (wrHtml5QrCode) {
+        try { wrHtml5QrCode.stop().catch(()=>{}); wrHtml5QrCode = null; } catch(e) {}
+      }
+
+    }
+  }
+
+  function refreshCurrentView() {
+    if (currentTab === 'service') { svcLoad(); showToast('🔄 Syncing...'); }
+    else wrRunSync();
+  }
+
+  // ── RIPPLE ────────────────────────────────────────────────────────────────
+  function addRipple(e, el) {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e && e.touches ? e.touches[0].clientX : (e ? e.clientX : rect.left+rect.width/2)) - rect.left;
+    const y = (e && e.touches ? e.touches[0].clientY : (e ? e.clientY : rect.top+rect.height/2)) - rect.top;
+    const size = Math.max(rect.width, rect.height) * 2.5;
+    const r = document.createElement('span');
+    r.className = 'ripple-circle';
+    r.style.cssText = `width:${size}px;height:${size}px;left:${x-size/2}px;top:${y-size/2}px`;
+    el.appendChild(r);
+    r.addEventListener('animationend', () => r.remove());
+  }
+
+  // ── TOAST ─────────────────────────────────────────────────────────────────
+  let _toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── LIGHTBOX ──────────────────────────────────────────────────────────────
+  function openLightbox(src) { document.getElementById('lightboxImg').src = src; document.getElementById('lightbox').classList.add('active'); }
+  function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
+
+  // ── NOTIFICATIONS ─────────────────────────────────────────────────────────
+  function checkNotifPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') document.getElementById('notifBanner').classList.add('show');
+  }
+  function requestNotifPermission() {
+    Notification.requestPermission().then(p => {
+      document.getElementById('notifBanner').classList.remove('show');
+      if (p === 'granted') showToast('🔔 Notifications enabled!');
+    });
+  }
+  function showSvcNotification(title, body) {
+    // Disabled — FCM Kotlin service handles all notifications to avoid duplicates
+  }
+
+  // ── SERVICE DATA ──────────────────────────────────────────────────────────
+  function isInhouse(c) { return c.resolutionMethod === 'Walk-in' || c.resolutionMethod === 'Courier'; }
+
+  async function svcLoad() {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(SVC_API + '?action=getAll&t=' + Date.now(), { redirect: 'follow', signal: controller.signal });
+      clearTimeout(timer);
+      const data = await response.json();
+      svcComplaints = data.filter(isInhouse);
+
+      // Check for new in-house complaints — notify
+      svcComplaints.filter(c => {
+        return !svcPrevIds.has(String(c.id)) &&
+               new Date(c.createdAt) > new Date(svcInstallTime) &&
+               c.status === 'Received';
+      }).forEach(c => {
+        showSvcNotification('🔧 New In-House: ' + c.id, (c.resolutionMethod||'') + ' — ' + (c.machineType||'') + ' — ' + (c.problem||'').slice(0,60));
+      });
+
+      svcComplaints.forEach(c => svcPrevIds.add(String(c.id)));
+      localStorage.setItem('svc_known_ids', JSON.stringify([...svcPrevIds]));
+      localStorage.setItem('svc_complaints', JSON.stringify(svcComplaints));
+      svcRender();
+      updateServiceBadge();
+    } catch(e) {
+      const cached = localStorage.getItem('svc_complaints');
+      if (cached) { svcComplaints = JSON.parse(cached).filter(isInhouse); svcRender(); }
+    }
+  }
+
+  function svcStartPolling() {
+    clearInterval(svcPollInterval);
+    svcPollInterval = setInterval(svcLoad, 30000);
+  }
+
+  function updateServiceBadge() {
+    const active = svcComplaints.filter(c => ['Received','Under Repair'].includes(c.status)).length;
+    const badge = document.getElementById('serviceBadge');
+    if (badge) { badge.textContent = active; badge.style.display = active > 0 ? 'block' : 'none'; }
+  }
+
+  // ── SERVICE RENDER ────────────────────────────────────────────────────────
+  function selectChip(el) {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    svcFilter = el.getAttribute('data-filter');
+    svcRender();
+  }
+
+  function svcRender() {
+    const container = document.getElementById('serviceList');
+    let list;
+    if (svcFilter === 'all') {
+      // All tab: show all EXCEPT Delivered and Closed
+      list = svcComplaints.filter(c => !['Delivered','Closed'].includes(c.status));
+    } else if (svcFilter === 'history') {
+      list = svcComplaints.filter(c => ['Delivered','Closed'].includes(c.status));
+    } else {
+      list = svcComplaints.filter(c => c.status === svcFilter);
+    }
+    list = list.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-text">No complaints in this category</div></div>';
+      return;
+    }
+
+    const statusColors = {'Received':'#3b82f6','Under Repair':'#f97316','Ready':'#22c55e','Delivered':'#94a3b8','Closed':'#64748b'};
+    container.innerHTML = list.map(c => {
+      const col = statusColors[c.status] || '#64748b';
+      const pillClass = {'Received':'pill-received','Under Repair':'pill-repair','Ready':'pill-ready','Delivered':'pill-delivered','Closed':'pill-closed'}[c.status] || '';
+      let quickBtns = '';
+      if (c.status === 'Received') quickBtns = `<div class="card-quick-btns"><button class="quick-btn q-repair" onclick="event.stopPropagation();svcQuickUpdate('${c.id}','Under Repair')">🔧 Under Repair</button></div>`;
+      else if (c.status === 'Under Repair') quickBtns = `<div class="card-quick-btns"><button class="quick-btn q-ready" onclick="event.stopPropagation();openDetailForReady('${c.id}')">✅ Mark Ready</button></div>`;
+      return `<div class="service-card" onclick="openDetail('${c.id}')">
+        <div class="card-accent" style="background:${col}"></div>
+        <div class="card-body">
+          <div class="card-top"><div class="card-id">${c.id} · ${c.resolutionMethod||''}</div><span class="pill ${pillClass}">${c.status}</span></div>
+          <div class="card-machine">${c.machineType||'Unknown'}</div>
+          <div class="card-problem">${c.problem||''}</div>
+          <div class="card-footer"><div class="card-phone">📱 ${cleanPhone(c.phone)}</div><div class="card-age">${timeAgo(c.createdAt)}</div></div>
+        </div>${quickBtns}</div>`;
+    }).join('');
+  }
+
+  // ── DETAIL SHEET ──────────────────────────────────────────────────────────
+  function openDetail(id) {
+    svcCurrentId = id;
+    const c = svcComplaints.find(x => String(x.id) === String(id));
+    if (!c) return;
+    // Stop wiring scanner to release camera/mic before opening detail
+    if (wrHtml5QrCode) {
+      try { wrHtml5QrCode.stop().catch(()=>{}); wrHtml5QrCode = null; } catch(e) {}
+    }
+    buildDetailSheet(c);
+    document.getElementById('detailSheet').classList.add('active');
+    lucide.createIcons();
+  }
+
+  function openDetailForReady(id) {
+    openDetail(id);
+    setTimeout(() => { const el = document.getElementById('sheetStatusActions'); if (el) el.scrollIntoView({behavior:'smooth'}); }, 350);
+  }
+
+  function closeDetail() {
+    document.getElementById('detailSheet').classList.remove('active');
+    svcCurrentId = null; _svcSlot2Data = null; stopSvcAudio();
+    // Restart wiring scanner if on wiring tab
+    if (currentTab === 'wiring' && !wrHtml5QrCode) {
+      setTimeout(wrStartScanner, 300);
+    }
+  }
+
+  function buildDetailSheet(c) {
+    document.getElementById('sheetTitle').textContent = 'ID: ' + c.id;
+    const statusColors = {'Received':'#3b82f6','Under Repair':'#f97316','Ready':'#22c55e','Delivered':'#94a3b8','Closed':'#64748b'};
+    const col = statusColors[c.status] || '#64748b';
+
+    let statusActionHtml = '';
+    if (c.status === 'Received') {
+      statusActionHtml = `<div class="status-actions" id="sheetStatusActions">
+        <button class="status-btn status-btn-repair" onclick="svcUpdateStatus('${c.id}','Under Repair')">🔧 Start Repair</button>
+      </div>`;
+    } else if (c.status === 'Under Repair') {
+      statusActionHtml = `<div id="sheetStatusActions">
+        <div class="resolution-section">
+          <div class="res-label-row">
+            <label class="res-label">Resolution Note *</label>
+            <div class="voice-btns">
+              <button type="button" class="voice-btn" onclick="startSvcVoice('sheetResNote','en-IN')">🎤 EN</button>
+              <button type="button" class="voice-btn" onclick="startSvcVoice('sheetResNote','ta-IN')">🎤 தமிழ்</button>
+            </div>
+          </div>
+          <textarea class="res-textarea" id="sheetResNote" placeholder="Describe what was repaired...">${c.resolutionNote||''}</textarea>
+        </div>
+        <div class="status-actions">
+          <button class="status-btn status-btn-ready" id="readyBtn" onclick="svcMarkReady('${c.id}')">✅ Mark as Ready</button>
+        </div>
+      </div>`;
+    } else if (c.status === 'Ready' || c.status === 'Delivered') {
+      // Allow editing resolution note even after ready
+      statusActionHtml = `<div id="sheetStatusActions">
+        <div class="resolution-section">
+          <div class="res-label-row">
+            <label class="res-label">Resolution Note</label>
+            <div class="voice-btns">
+              <button type="button" class="voice-btn" onclick="startSvcVoice('sheetResNote','en-IN')">🎤 EN</button>
+              <button type="button" class="voice-btn" onclick="startSvcVoice('sheetResNote','ta-IN')">🎤 தமிழ்</button>
+            </div>
+          </div>
+          <textarea class="res-textarea" id="sheetResNote" placeholder="Resolution notes...">${c.resolutionNote||''}</textarea>
+        </div>
+        <div class="status-actions">
+          <button class="status-btn status-btn-ready" id="saveNoteBtn" onclick="svcSaveNote('${c.id}')">💾 Save Note</button>
+        </div>
+      </div>`;
+    }
+
+    document.getElementById('sheetBody').innerHTML = `
+      <div class="detail-row"><div class="detail-label">Status</div><div class="detail-value"><span class="pill" style="background:${col}22;color:${col};">${c.status}</span></div></div>
+      <div class="detail-row"><div class="detail-label">Type</div><div class="detail-value">${c.resolutionMethod||'—'}</div></div>
+      <div class="detail-row"><div class="detail-label">Machine</div><div class="detail-value">${c.machineType||'—'}</div></div>
+      <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value">${cleanPhone(c.phone)}</div></div>
+      <div class="detail-row"><div class="detail-label">Problem</div><div class="detail-value">${c.problem||'—'}</div></div>
+      ${c.details?`<div class="detail-row"><div class="detail-label">Details</div><div class="detail-value">${c.details}</div></div>`:''}
+      <div class="detail-row"><div class="detail-label">Warranty</div><div class="detail-value">${c.warranty||'Unknown'}</div></div>
+      ${c.resolutionNote&&c.status==='Closed'?`<div class="detail-row"><div class="detail-label">Resolution Note</div><div class="detail-value">${c.resolutionNote}</div></div>`:''}
+      <div class="detail-row"><div class="detail-label">Received</div><div class="detail-value">${c.createdAt?new Date(c.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div></div>
+      ${statusActionHtml}
+      <div class="detail-label" style="margin:0.75rem 0 0.4rem;">Media</div>
+      <div class="media-row" style="flex-direction:column;">
+        ${buildMediaViewHtml(c.imageUrl,1)}
+        ${buildSlot2Html(c)}
+        ${buildMediaViewHtml(c.imageUrl3,3)}
+      </div>`;
+
+    loadSlotMedia(c.imageUrl,'svcSlot1');
+    loadSlotMedia(c.imageUrl2,'svcSlot2');
+    loadSlotMedia(c.imageUrl3,'svcSlot3');
+  }
+
+  function buildMediaViewHtml(url, slot) {
+    if (!url) return `<div class="media-box" id="svcSlot${slot}" style="opacity:0.4;">
+      <i data-lucide="image" style="width:20px;height:20px;opacity:0.4;"></i>
+      <span style="font-size:0.6rem;color:#8e8e93;">Slot ${slot}</span>
+    </div>`;
+    return `<div class="media-box" id="svcSlot${slot}">
+      <img id="svcSlot${slot}Img" style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:10px;cursor:zoom-in;" onclick="openLightbox(this.src)">
+      <div id="svcSlot${slot}Vid" style="display:none;text-align:center;padding:0.75rem;cursor:pointer;" onclick="svcPlaySlotVideo(${slot})">
+        <div style="font-size:2rem;">🎥</div><div style="font-size:0.72rem;color:#3b82f6;font-weight:600;">▶ Play Video</div>
+      </div>
+      <div id="svcSlot${slot}Aud" style="display:none;padding:0.5rem;width:100%;">
+        <audio id="svcSlot${slot}Audio" controls style="width:100%;border-radius:6px;"></audio>
+        <div style="font-size:0.65rem;color:#a855f7;text-align:center;margin-top:0.2rem;">🎙️ Audio recording</div>
+      </div>
+      <i data-lucide="image" style="width:20px;height:20px;opacity:0.3;"></i>
+      <span style="font-size:0.6rem;opacity:0.5;">Slot ${slot}</span>
+    </div>`;
+  }
+
+  function buildSlot2Html(c) {
+    if (c.imageUrl2) {
+      // Has media — read only
+      return `<div class="media-box" id="svcSlot2" style="min-height:80px;padding:0.5rem;">
+        <img id="svcSlot2Img" style="display:none;width:100%;max-height:180px;object-fit:cover;border-radius:10px;cursor:zoom-in;" onclick="openLightbox(this.src)">
+        <div id="svcSlot2Vid" style="display:none;text-align:center;padding:0.75rem;cursor:pointer;width:100%;" onclick="svcPlaySlot2Video()">
+          <div style="font-size:2rem;">🎥</div><div style="font-size:0.72rem;color:#3b82f6;font-weight:600;">▶ Play Video</div>
+        </div>
+        <div id="svcSlot2Aud" style="display:none;padding:0.25rem;width:100%;">
+          <audio id="svcSlot2Audio" controls style="width:100%;border-radius:6px;"></audio>
+          <div style="font-size:0.65rem;color:#a855f7;text-align:center;margin-top:0.2rem;">🎙️ Audio recording</div>
+        </div>
+        <i data-lucide="image" style="width:20px;height:20px;opacity:0.3;"></i>
+        <span style="font-size:0.6rem;opacity:0.5;">Slot 2</span>
+      </div>`;
+    }
+    return `<div class="media-box uploadable" id="svcSlot2" style="min-height:120px;padding:0.5rem;flex-direction:column;gap:0.4rem;">
+      <!-- Preview areas (hidden until media selected) -->
+      <img id="svcSlot2Img" style="display:none;width:100%;max-height:180px;object-fit:cover;border-radius:10px;cursor:zoom-in;" onclick="openLightbox(this.src)">
+      <div id="svcSlot2Vid" style="display:none;text-align:center;padding:0.75rem;cursor:pointer;width:100%;" onclick="svcPlaySlot2Video()">
+        <div style="font-size:2rem;">🎥</div><div style="font-size:0.72rem;color:#3b82f6;font-weight:600;">▶ Play Video</div>
+      </div>
+      <div id="svcSlot2Aud" style="display:none;padding:0.25rem;width:100%;">
+        <audio id="svcSlot2Audio" controls style="width:100%;border-radius:6px;"></audio>
+        <div style="font-size:0.65rem;color:#a855f7;text-align:center;margin-top:0.2rem;">🎙️ Audio recording</div>
+      </div>
+      <!-- Upload progress bar -->
+      <div id="svcUploadProgress" style="display:none;width:100%;padding:0.4rem 0;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;">
+          <span style="font-size:0.72rem;color:#f97316;font-weight:700;" id="svcUploadLabel">Uploading...</span>
+          <span style="font-size:0.72rem;color:#f97316;font-weight:700;" id="svcUploadPct">0%</span>
+        </div>
+        <div style="width:100%;height:6px;background:#e5e5ea;border-radius:99px;overflow:hidden;">
+          <div id="svcUploadFill" style="height:100%;background:linear-gradient(90deg,#f97316,#f59e0b);border-radius:99px;width:0%;transition:width 0.2s;"></div>
+        </div>
+      </div>
+      <!-- Recording in progress UI -->
+      <div id="svcAudioUI" style="display:none;text-align:center;padding:0.5rem;width:100%;background:rgba(168,85,247,0.08);border-radius:8px;">
+        <div style="font-size:0.8rem;color:#a855f7;font-weight:700;">🔴 Recording... <span id="svcAudioTimer">0:00</span></div>
+        <button type="button" onclick="event.stopPropagation();stopSvcAudio()" style="margin-top:0.4rem;background:rgba(168,85,247,0.2);border:1px solid #a855f7;color:#a855f7;border-radius:8px;padding:0.3rem 0.75rem;font-size:0.72rem;cursor:pointer;font-weight:700;">⏹ Stop</button>
+      </div>
+      <!-- Upload buttons -->
+      <div id="svcSlot2Placeholder" style="display:flex;flex-direction:column;align-items:center;gap:0.4rem;width:100%;">
+        <span style="font-size:0.68rem;color:#8e8e93;font-weight:600;">Media Slot 2</span>
+        <div style="display:flex;gap:0.35rem;flex-wrap:wrap;justify-content:center;">
+          <button type="button" class="media-upload-btn" onclick="event.stopPropagation();setTimeout(function(){document.getElementById('svcS2Cam').click();},50)">📷 Capture</button>
+          <button type="button" class="media-upload-btn" onclick="event.stopPropagation();setTimeout(function(){document.getElementById('svcS2Img').click();},50)">🖼️ Photo</button>
+          <button type="button" class="media-upload-btn" onclick="event.stopPropagation();setTimeout(function(){document.getElementById('svcS2VidR').click();},50)">🔴 Record</button>
+          <button type="button" class="media-upload-btn" onclick="event.stopPropagation();setTimeout(function(){document.getElementById('svcS2Vid').click();},50)">📁 Video</button>
+          <button type="button" class="media-upload-btn audio" id="svcAudioBtn" onclick="event.stopPropagation();toggleSvcAudio()">🎙️ Audio</button>
+        </div>
+      </div>
+      <!-- Cancel button (hidden until media selected) -->
+      <button type="button" class="slot2-cancel" id="svcSlot2Cancel" style="display:none;" onclick="event.stopPropagation();svcCancelSlot2()">✕ Remove Media</button>
+    </div>`;
+  }
+
+
+  async function loadSlotMedia(url, slotId) {
+    const el = document.getElementById(slotId);
+    if (!el || !url) return;
+
+    // For slot2 with named sub-elements
+    const isSlot2 = slotId === 'svcSlot2';
+    const imgEl = isSlot2 ? document.getElementById('svcSlot2Img') : null;
+    const vidEl = isSlot2 ? document.getElementById('svcSlot2Vid') : null;
+    const audEl = isSlot2 ? document.getElementById('svcSlot2Aud') : null;
+    const audioEl = isSlot2 ? document.getElementById('svcSlot2Audio') : null;
+    const iconEl = isSlot2 ? el.querySelector('i') : null;
+    const spanEl = isSlot2 ? el.querySelector('span') : null;
+
+    if (url.startsWith('TG_FILE_ID:')) {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${url.replace('TG_FILE_ID:','')}`);
+        const d = await res.json();
+        if (d.ok) {
+          const u = `https://api.telegram.org/file/bot${TG_TOKEN}/${d.result.file_path}`;
+          if (imgEl) { imgEl.src = u; imgEl.style.display = 'block'; if(iconEl)iconEl.style.display='none'; if(spanEl)spanEl.style.display='none'; }
+          else { el.innerHTML = `<img src="${u}" onclick="openLightbox('${u}')" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`; }
+        }
+      } catch(e) {}
+    } else if (url.startsWith('TG_VIDEO:')) {
+      if (vidEl) {
+        vidEl.style.display = 'block';
+        window._svcSlot2VideoFileId = url.replace('TG_VIDEO:','');
+        if(iconEl)iconEl.style.display='none'; if(spanEl)spanEl.style.display='none';
+      } else {
+        el.innerHTML = `<div style="text-align:center;padding:0.5rem;cursor:pointer;" onclick="svcPlayVideo('${url}')"><div style="font-size:1.5rem;">🎥</div><div style="font-size:0.6rem;color:#3b82f6;">▶ Play</div></div>`;
+      }
+    } else if (url.startsWith('TG_AUDIO:')) {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${url.replace('TG_AUDIO:','')}`);
+        const d = await res.json();
+        if (d.ok) {
+          const u = `https://api.telegram.org/file/bot${TG_TOKEN}/${d.result.file_path}`;
+          if (audEl && audioEl) {
+            audEl.style.display = 'block'; audioEl.src = u;
+            if(iconEl)iconEl.style.display='none'; if(spanEl)spanEl.style.display='none';
+          } else {
+            el.innerHTML = `<div style="padding:0.25rem;width:100%;"><audio controls style="width:100%;border-radius:6px;" src="${u}"></audio><div style="font-size:0.6rem;color:#a855f7;text-align:center;">🎙️</div></div>`;
+          }
+        }
+      } catch(e) {}
+    } else if (url.startsWith('data:') || url.startsWith('http')) {
+      if (imgEl) { imgEl.src = url; imgEl.style.display = 'block'; if(iconEl)iconEl.style.display='none'; if(spanEl)spanEl.style.display='none'; }
+      else { el.innerHTML = `<img src="${url}" onclick="openLightbox('${url}')" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`; }
+    }
+  }
+
+  function svcMediaTap(slotId, url) {
+    if (!url || url === 'undefined') return;
+    if (url.startsWith('TG_VIDEO:')) { svcPlayVideo(url); return; }
+    const img = document.querySelector('#' + slotId + ' img');
+    if (img) openLightbox(img.src);
+  }
+
+  async function svcPlayVideo(url) {
+    svcPlayVideoById(url.replace('TG_VIDEO:',''));
+  }
+
+  var _saveBtnTexts = {};
+  function svcSetSaveBtn(disabled, text) {
+    ['readyBtn','saveNoteBtn'].forEach(function(id) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      if (disabled && !_saveBtnTexts[id]) _saveBtnTexts[id] = btn.innerHTML;
+      btn.disabled = disabled;
+      if (text) btn.innerHTML = text;
+      else if (!disabled && _saveBtnTexts[id]) { btn.innerHTML = _saveBtnTexts[id]; _saveBtnTexts[id] = null; }
+      btn.style.opacity = disabled ? '0.6' : '1';
+    });
+  }
+
+  function svcShowProgress(text, pct) {
+    var p = document.getElementById('svcUploadProgress');
+    var l = document.getElementById('svcUploadLabel');
+    var pc = document.getElementById('svcUploadPct');
+    var fill = document.getElementById('svcUploadFill');
+    if (p) p.style.display = 'block';
+    if (l) l.textContent = text || 'Uploading...';
+    if (pc) pc.textContent = (pct !== undefined ? pct : 0) + '%';
+    if (fill) fill.style.width = (pct !== undefined ? pct : 0) + '%';
+    svcSetSaveBtn(true, '⏳ Wait...');
+  }
+
+  function svcHideProgress() {
+    var p = document.getElementById('svcUploadProgress');
+    if (p) p.style.display = 'none';
+    var fill = document.getElementById('svcUploadFill');
+    if (fill) fill.style.width = '0%';
+    svcSetSaveBtn(false, null);
+  }
+
+  // ── MEDIA UPLOAD — exact same as main app ───────────────────────────────
+
+  function svcHandleImgUpload(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = async function() {
+        const canvas = document.createElement('canvas');
+        const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', 0.7);
+
+        const imgEl = document.getElementById('svcSlot2Img');
+        const placeholder = document.getElementById('svcSlot2Placeholder');
+        const cancelBtn = document.getElementById('svcSlot2Cancel');
+        if (imgEl) { imgEl.src = compressed; imgEl.style.display = 'block'; imgEl.style.cursor = 'zoom-in'; imgEl.onclick = function(){ openLightbox(compressed); }; }
+        if (placeholder) placeholder.style.display = 'none';
+        if (cancelBtn) cancelBtn.style.display = 'block';
+        _svcSlot2Data = compressed;
+
+        showToast('📤 Uploading to cloud...');
+        try {
+          const fd = new FormData();
+          fd.append('chat_id', TG_CHAT);
+          fd.append('photo', input.files[0]);
+          const res = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendPhoto', {method:'POST', body:fd});
+          const d = await res.json();
+          if (d.ok) {
+            _svcSlot2Data = 'TG_FILE_ID:' + d.result.photo[d.result.photo.length-1].file_id;
+            showToast('✅ Photo saved to cloud!');
+          } else {
+            showToast('⚠️ Cloud upload failed — saved locally');
+          }
+        } catch(e) {
+          showToast('⚠️ Offline — saved locally');
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+
+  function svcHandleVidUpload(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    var vidEl = document.getElementById('svcSlot2Vid');
+    var placeholder = document.getElementById('svcSlot2Placeholder');
+    var cancelBtn = document.getElementById('svcSlot2Cancel');
+    if (placeholder) placeholder.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'block';
+    if (vidEl) { vidEl.innerHTML = '<div style="font-size:2rem;">🎥</div><div style="font-size:0.72rem;color:#8e8e93;">Uploading...</div>'; vidEl.style.display = 'block'; }
+    // Show progress bar + disable save button
+    svcShowProgress('🎥 Uploading ' + sizeMB + 'MB...', 0);
+    showToast('⬆️ Uploading video ' + sizeMB + 'MB...');
+    var fd = new FormData();
+    fd.append('chat_id', TG_CHAT);
+    fd.append('video', file);
+    fd.append('caption', 'KM Wire - Service Media');
+    var xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable) {
+        var pct = Math.round(e.loaded / e.total * 100);
+        svcShowProgress('🎥 Uploading ' + sizeMB + 'MB... ' + pct + '%', pct);
+      }
+    };
+    xhr.onload = function() {
+      svcHideProgress();
+      try {
+        var d = JSON.parse(xhr.responseText);
+        if (d.ok) {
+          var fileId = (d.result.video && d.result.video.file_id) || (d.result.document && d.result.document.file_id);
+          _svcSlot2Data = 'TG_VIDEO:' + fileId;
+          window._svcSlot2VideoFileId = fileId;
+          if (vidEl) vidEl.innerHTML = '<div style="font-size:2rem;">🎥</div><div style="font-size:0.72rem;color:#3b82f6;font-weight:600;">▶ Tap to play</div>';
+          showToast('✅ Video saved to cloud!');
+        } else {
+          if (placeholder) placeholder.style.display = 'flex';
+          if (vidEl) vidEl.style.display = 'none';
+          if (cancelBtn) cancelBtn.style.display = 'none';
+          showToast('❌ Upload failed');
+        }
+      } catch(e) { svcHideProgress(); showToast('❌ Upload error'); }
+    };
+    xhr.onerror = function() {
+      svcHideProgress();
+      if (placeholder) placeholder.style.display = 'flex';
+      if (vidEl) vidEl.style.display = 'none';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      showToast('❌ Upload failed');
+    };
+    xhr.open('POST', 'https://api.telegram.org/bot' + TG_TOKEN + '/sendVideo');
+    xhr.send(fd);
+  }
+
+  async function svcPlaySlot2Video() {
+    const fileId = window._svcSlot2VideoFileId;
+    if (!fileId) return;
+    svcPlayVideoById(fileId);
+  }
+
+  async function svcPlaySlotVideo(slot) {
+    const fileId = window['_svcSlot'+slot+'VideoFileId'];
+    if (!fileId) return;
+    svcPlayVideoById(fileId);
+  }
+
+  async function svcPlayVideoById(fileIdOrUrl) {
+    const id = String(fileIdOrUrl).replace('TG_VIDEO:','').replace('TG_FILE_ID:','');
+    showToast('⏳ Loading video...');
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getFile?file_id=${id}`);
+      const d = await res.json();
+      if (d.ok) {
+        const url = `https://api.telegram.org/file/bot${TG_TOKEN}/${d.result.file_path}`;
+        svcShowVideoPlayer(url);
+      } else { showToast('❌ Could not load video'); }
+    } catch(e) { showToast('❌ Video error'); }
+  }
+
+  function svcShowVideoPlayer(url) {
+    const existing = document.getElementById('svcVideoOverlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'svcVideoOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="width:100%;max-width:500px;padding:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <span style="color:white;font-weight:600;font-size:1rem;">🎥 Video</span>
+          <button onclick="document.getElementById('svcVideoOverlay').remove()"
+            style="background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+        <video controls autoplay playsinline
+          style="width:100%;border-radius:12px;background:#000;max-height:70vh;"
+          src="${url}">
+          Your browser does not support video playback.
+        </video>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  // Audio note using SpeechRecognition (works in WebView without getUserMedia)
+  // Audio recording — exact same as main app toggleAudioRecording
+  async function toggleSvcAudio() {
+    if (_svcAudioRecorder && _svcAudioRecorder.state === 'recording') {
+      _svcAudioRecorder.stop();
+      return;
+    }
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _svcAudioChunks = [];
+      _svcAudioSecs = 0;
+      _svcAudioRecorder = new MediaRecorder(stream);
+
+      _svcAudioRecorder.ondataavailable = function(e) {
+        if (e.data.size > 0) _svcAudioChunks.push(e.data);
+      };
+
+      _svcAudioRecorder.onstop = async function() {
+        stream.getTracks().forEach(function(t) { t.stop(); });
+        clearInterval(_svcAudioTimer);
+        var audioUI = document.getElementById('svcAudioUI');
+        var btn = document.getElementById('svcAudioBtn');
+        if (audioUI) audioUI.style.display = 'none';
+        if (btn) btn.textContent = '🎙️ Audio';
+
+        var blob = new Blob(_svcAudioChunks, { type: 'audio/ogg; codecs=opus' });
+        showToast('⬆️ Uploading audio to cloud...');
+        try {
+          var fd = new FormData();
+          fd.append('chat_id', TG_CHAT);
+          fd.append('voice', blob, 'audio_' + Date.now() + '.ogg');
+          var res = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendVoice', { method: 'POST', body: fd });
+          var data = await res.json();
+          if (data.ok) {
+            var fileId = data.result.voice.file_id;
+            _svcSlot2Data = 'TG_AUDIO:' + fileId;
+            var audDiv = document.getElementById('svcSlot2Aud');
+            var audioEl = document.getElementById('svcSlot2Audio');
+            var placeholder = document.getElementById('svcSlot2Placeholder');
+            var cancelBtn = document.getElementById('svcSlot2Cancel');
+            if (placeholder) placeholder.style.display = 'none';
+            if (audDiv) audDiv.style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'block';
+            try {
+              var fr = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/getFile?file_id=' + fileId);
+              var fd2 = await fr.json();
+              if (fd2.ok && audioEl) audioEl.src = 'https://api.telegram.org/file/bot' + TG_TOKEN + '/' + fd2.result.file_path;
+            } catch(e2) {}
+            showToast('🎙️ Audio saved to cloud!');
+          } else {
+            throw new Error('Telegram upload failed');
+          }
+        } catch(e) {
+          showToast('❌ Audio upload failed');
+        }
+      };
+
+      _svcAudioRecorder.start();
+  
+      var audioUI = document.getElementById('svcAudioUI');
+      var placeholder = document.getElementById('svcSlot2Placeholder');
+      var btn = document.getElementById('svcAudioBtn');
+      if (audioUI) audioUI.style.display = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+      if (btn) btn.textContent = '⏹ Stop';
+
+      _svcAudioTimer = setInterval(function() {
+        _svcAudioSecs++;
+        var m = Math.floor(_svcAudioSecs / 60);
+        var s = _svcAudioSecs % 60;
+        var timerEl = document.getElementById('svcAudioTimer');
+        if (timerEl) timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        if (_svcAudioSecs >= 120) _svcAudioRecorder.stop();
+      }, 1000);
+
+    } catch(e) {
+      showToast('❌ Microphone error: ' + e.name);
+    }
+  }
+
+  function stopSvcAudio() {
+    if (_svcAudioRecorder && _svcAudioRecorder.state === 'recording') _svcAudioRecorder.stop();
+    clearInterval(_svcAudioTimer);
+    var audioUI = document.getElementById('svcAudioUI');
+    var btn = document.getElementById('svcAudioBtn');
+    if (audioUI) audioUI.style.display = 'none';
+    if (btn) btn.textContent = '🎙️ Audio';
+  }
+
+  function svcCancelSlot2() {
+    var imgEl = document.getElementById('svcSlot2Img');
+    var vidEl = document.getElementById('svcSlot2Vid');
+    var audEl = document.getElementById('svcSlot2Aud');
+    var audioEl = document.getElementById('svcSlot2Audio');
+    var placeholder = document.getElementById('svcSlot2Placeholder');
+    var cancelBtn = document.getElementById('svcSlot2Cancel');
+    var audioUI = document.getElementById('svcAudioUI');
+    var progress = document.getElementById('svcUploadProgress');
+    if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+    if (vidEl) vidEl.style.display = 'none';
+    if (audEl) audEl.style.display = 'none';
+    if (audioEl) audioEl.src = '';
+    if (audioUI) audioUI.style.display = 'none';
+    if (progress) progress.style.display = 'none';
+    if (placeholder) placeholder.style.display = 'flex';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    ['svcS2Img','svcS2Cam','svcS2Vid','svcS2VidR'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    _svcSlot2Data = null;
+    window._svcSlot2VideoFileId = null;
+    stopSvcAudio();
+    showToast('🗑️ Media removed');
+  }
+
+  // ── STATUS UPDATES ────────────────────────────────────────────────────────
+  function svcQuickUpdate(id, newStatus) {
+    showToast('💾 Saving...');
+    const c = svcComplaints.find(x => String(x.id)===String(id));
+    if (!c) return;
+    c.status = newStatus; c.updatedAt = new Date();
+    localStorage.setItem('svc_complaints', JSON.stringify(svcComplaints));
+    svcSendUpdate({id:c.id, status:newStatus});
+    svcRender(); updateServiceBadge();
+    showToast('✅ Updated: ' + newStatus);
+  }
+
+  function svcUpdateStatus(id, newStatus) {
+    svcQuickUpdate(id, newStatus);
+    closeDetail();
+  }
+
+  async function svcMarkReady(id) {
+    const note = document.getElementById('sheetResNote');
+    const resNote = note ? note.value.trim() : '';
+    if (!resNote) { showToast('⚠️ Please enter a resolution note'); note && note.focus(); return; }
+    const btn = document.getElementById('readyBtn');
+    if (btn) { btn.textContent = '💾 Saving...'; btn.disabled = true; }
+    const c = svcComplaints.find(x => String(x.id)===String(id));
+    if (!c) return;
+    // Upload photo to Telegram if it's still base64
+    if (_svcSlot2Data && _svcSlot2Data.startsWith('data:')) {
+      showToast('📤 Uploading photo to cloud...');
+      const tgResult = await svcUploadPhotoBase64(_svcSlot2Data);
+      if (tgResult) _svcSlot2Data = tgResult;
+    }
+    c.status = 'Ready'; c.resolutionNote = resNote; c.updatedAt = new Date();
+    if (_svcSlot2Data) c.imageUrl2 = _svcSlot2Data;
+    localStorage.setItem('svc_complaints', JSON.stringify(svcComplaints));
+    const updateData = {id:c.id, status:'Ready', resolutionNote:resNote};
+    if (_svcSlot2Data) updateData.imageUrl2 = _svcSlot2Data;
+    await svcSendUpdate(updateData);
+    svcRender(); updateServiceBadge(); closeDetail();
+    showToast('✅ Machine marked as Ready!');
+  }
+
+  async function svcUploadPhotoBase64(dataUrl) {
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const fd = new FormData();
+      fd.append('chat_id', TG_CHAT);
+      fd.append('photo', blob, 'photo.jpg');
+      const r = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendPhoto', {method:'POST', body:fd});
+      const d = await r.json();
+      if (d.ok) return 'TG_FILE_ID:' + d.result.photo[d.result.photo.length-1].file_id;
+    } catch(e) {}
+    return null;
+  }
+
+  async function svcSaveNote(id) {
+    const note = document.getElementById('sheetResNote');
+    const resNote = note ? note.value.trim() : '';
+    if (!resNote) { showToast('⚠️ Please enter a note'); return; }
+    const btn = document.getElementById('saveNoteBtn');
+    if (btn) { btn.textContent = '💾 Saving...'; btn.disabled = true; }
+    const c = svcComplaints.find(x => String(x.id)===String(id));
+    if (!c) return;
+    // Upload photo to Telegram if still base64
+    if (_svcSlot2Data && _svcSlot2Data.startsWith('data:')) {
+      showToast('📤 Uploading photo to cloud...');
+      const tgResult = await svcUploadPhotoBase64(_svcSlot2Data);
+      if (tgResult) _svcSlot2Data = tgResult;
+    }
+    c.resolutionNote = resNote; c.updatedAt = new Date();
+    if (_svcSlot2Data) c.imageUrl2 = _svcSlot2Data;
+    localStorage.setItem('svc_complaints', JSON.stringify(svcComplaints));
+    const updateData = {id:c.id, resolutionNote:resNote};
+    if (_svcSlot2Data) updateData.imageUrl2 = _svcSlot2Data;
+    await svcSendUpdate(updateData);
+    if (btn) { btn.textContent = '✅ Saved!'; }
+    showToast('✅ Note saved!');
+    setTimeout(() => { if (btn) { btn.textContent = '💾 Save Note'; btn.disabled = false; } }, 1500);
+  }
+
+  async function svcSendUpdate(data) {
+    try {
+      await fetch(SVC_API, {
+        method:'POST', redirect:'follow',
+        headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'update', data})
+      });
+    } catch(e) { showToast('⚠️ Saved locally'); }
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function cleanPhone(p) {
+    if (!p) return '—';
+    let s = String(p).replace(/\D/g,'');
+    if (s.startsWith('91') && s.length===12) s=s.slice(2);
+    if (s.startsWith('0') && s.length===11) s=s.slice(1);
+    return s.length===10 ? s : String(p);
+  }
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const mins = Math.floor((Date.now()-new Date(dateStr))/60000);
+    if (mins<1) return 'just now';
+    if (mins<60) return mins+'m ago';
+    const hrs=Math.floor(mins/60);
+    if (hrs<24) return hrs+'h ago';
+    return Math.floor(hrs/24)+'d ago';
+  }
+
+  // ── WIRING (completely isolated) ──────────────────────────────────────────
+  function wrInitDate() { document.getElementById('wr-date').value = new Date().toISOString().split('T')[0]; }
+
+  // === FETCH MACHINE LIST FROM REGISTRY (NEW) ===
+  // Replaces hardcoded machine button grid with dynamically populated one.
+  // If fetch fails, falls back to hardcoded FALLBACK_MODELS list.
+  async function wrFetchMachines() {
+    try {
+      const res = await fetch(MACHINES_URL);
+      const data = await res.json();
+      if (data.machines && data.machines.length > 0) {
+        // Extract unique model names (each model has 2 material types: SS + MS)
+        ACTIVE_MODELS = [...new Set(data.machines.map(m => m.model_name))];
+        console.log('Loaded ' + ACTIVE_MODELS.length + ' models from registry:', ACTIVE_MODELS);
+      }
+    } catch (err) {
+      console.warn('Dynamic fetch failed, using fallback list:', err);
+    }
+    wrPopulateMachineGrid();
+  }
+
+  // === POPULATE MACHINE BUTTON GRID DYNAMICALLY (NEW) ===
+  function wrPopulateMachineGrid() {
+    const grid = document.getElementById('wr-machine-buttons');
+    if (!grid) return;
+    grid.innerHTML = '';
+    ACTIVE_MODELS.forEach(model => {
+      const btn = document.createElement('button');
+      btn.className = 'm-btn';
+      btn.innerText = model;
+      btn.onclick = () => wrSelectMachine(model);
+      grid.appendChild(btn);
+    });
+    // Add Clear button at the end
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'm-btn';
+    clearBtn.innerText = 'Clear';
+    clearBtn.onclick = () => wrSelectMachine('');
+    grid.appendChild(clearBtn);
+  }
+
+  function wrSelectMachine(name) {
+    wrSelectedMachine = name;
+    document.querySelectorAll('.m-btn').forEach(b => b.classList.toggle('active', b.textContent===name));
+    wrCheckDup();
+  }
+
+  function wrHandleSerial() { wrCheckDup(); }
+
+  function wrCheckDup() {
+    const s = document.getElementById('wr-serial').value.trim().toUpperCase();
+    const warn = document.getElementById('wr-dup-warn');
+    const btn = document.getElementById('wr-submit-btn');
+    if (!s) { btn.disabled=true; warn.style.display='none'; return; }
+    const history = JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]');
+    const isDup = history.some(x=>x.serial===s) || wrPendingQueue.some(x=>x.serial===s);
+    warn.style.display = isDup ? 'block' : 'none';
+    btn.disabled = isDup || !wrSelectedMachine;
+  }
+
+  async function wrRunSync() {
+    const btn = document.getElementById('wr-sync-btn');
+    if (btn) btn.textContent = '⏳';
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(WIRING_CSV_URL, { signal: controller.signal });
+      clearTimeout(timer);
+      const text = await res.text();
+      wrParseWiring(text);
+      const now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      localStorage.setItem(WR_LS_TIME, now);
+      const el = document.getElementById('wr-sync-time');
+      if (el) el.textContent = now;
+      const elh = document.getElementById('wr-sync-time-h');
+      if (elh) elh.textContent = now;
+      showToast('✅ Wiring data synced');
+    } catch(e) { showToast('⚠️ Sync failed'); }
+    if (btn) btn.textContent = '🔄';
+    wrUpdateGoal(); wrRenderHistory(); wrAutoPush();
+  }
+
+  // === DYNAMIC COLUMN DISCOVERY ===
+  // Replaces the old hardcoded `machines=[{name:'CIDM',col:1},...]` map.
+  // Now reads headers from CSV and builds the map dynamically, so new machine
+  // columns added by addMachine() are automatically picked up.
+  function wrParseWiring(text) {
+    const rows=text.split('\n'); const history=[];
+    if (rows.length<2) { localStorage.setItem(WR_LS_HIST, JSON.stringify(history)); return; }
+    
+    // Parse headers + build dynamic machineCols map
+    const rawHeaders = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
+    const ignoreExact = ['id', 's.no', 'sno', 'no', '#'];
+    const ignoreSubstrings = ['date', 'time', 'shift', 'operator', 'status', 'remark', 
+                              'note', 'total', 'count', 'day', 'name', 'model', 
+                              'serial', 'input', 'scan'];
+    const machineCols = {};  // { col_index: model_name }
+    rawHeaders.forEach((h, idx) => {
+      if (!h) return;
+      const lh = h.toLowerCase();
+      if (ignoreExact.includes(lh) || ignoreSubstrings.some(k => lh.includes(k))) return;
+      machineCols[idx] = h;
+    });
+    
+    for (let i=1;i<rows.length;i++) {
+      const cells=rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+      const dateStr=cells[0]||'';
+      for (const [idx, name] of Object.entries(machineCols)) {
+        const s=cells[idx]?cells[idx].trim().toUpperCase():'';
+        if(s.startsWith('KM')||s.startsWith('SSKM')) history.push({serial:s,type:name,date:dateStr,status:'synced'});
+      }
+    }
+    localStorage.setItem(WR_LS_HIST, JSON.stringify(history));
+  }
+
+  async function wrSubmit() {
+    const s = document.getElementById('wr-serial').value.trim().toUpperCase();
+    const t = wrSelectedMachine;
+    const d = document.getElementById('wr-date').value;
+    const btn = document.getElementById('wr-submit-btn');
+    if (!s || !t) { showToast('⚠️ Select machine type'); return; }
+    btn.disabled=true; btn.textContent='⏳ Submitting...';
+    const data = {serial:s, machineType:t, date:d};
+    try {
+      if (!navigator.onLine) throw new Error('Offline');
+      await fetch(WIRING_SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(data)});
+      btn.textContent='✓ Success!';
+      let history=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]');
+      history.push({serial:s,type:t,date:d,status:'synced'});
+      localStorage.setItem(WR_LS_HIST,JSON.stringify(history));
+      showToast('✅ Wiring submitted successfully!');
+    } catch(e) {
+      wrPendingQueue.push(data);
+      localStorage.setItem('wiring_pending',JSON.stringify(wrPendingQueue));
+      btn.textContent='📦 Saved Offline';
+      let history=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]');
+      history.push({serial:s,type:t,date:d,status:'pending'});
+      localStorage.setItem(WR_LS_HIST,JSON.stringify(history));
+      showToast('📦 Saved offline — will sync when online');
+    }
+    if (navigator.vibrate) navigator.vibrate([100,50,100]);
+    wrUpdatePendingUI(); wrUpdateGoal(); wrRenderHistory();
+    setTimeout(()=>{ document.getElementById('wr-serial').value=''; btn.textContent='SUBMIT WIRING'; btn.disabled=false; wrHandleSerial(); }, 1500);
+  }
+
+  async function wrAutoPush() {
+    if (wrPendingQueue.length===0||!navigator.onLine) return;
+    const data=wrPendingQueue[0];
+    try {
+      await fetch(WIRING_SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(data)});
+      wrPendingQueue.shift(); localStorage.setItem('wiring_pending',JSON.stringify(wrPendingQueue));
+      let history=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]');
+      const idx=history.findIndex(x=>x.serial===data.serial&&x.status==='pending');
+      if(idx!==-1) history[idx].status='synced';
+      localStorage.setItem(WR_LS_HIST,JSON.stringify(history));
+      wrUpdatePendingUI(); wrRenderHistory(); wrUpdateGoal();
+      showToast('📡 Offline record synced!');
+      if(wrPendingQueue.length>0) wrAutoPush();
+    } catch(e) {}
+  }
+  setInterval(wrAutoPush, 5000);
+
+  function wrUpdatePendingUI() {
+    const el=document.getElementById('wr-pending-tag');
+    if(el){el.textContent=wrPendingQueue.length+' PENDING';el.style.display=wrPendingQueue.length>0?'inline-block':'none';}
+  }
+
+  function wrUpdateGoal() {
+    const now=new Date();
+    const start=new Date(now); start.setDate(now.getDate()-now.getDay()); start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(start.getDate()+6);
+    const history=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]');
+    const count=history.filter(i=>{const d=wrParseDate(i.date);return d>=start&&d<=end;}).length;
+    const fill=document.getElementById('wr-goal-fill'), cur=document.getElementById('wr-goal-current');
+    if(fill) fill.style.width=Math.min((count/35)*100,100)+'%';
+    if(cur) cur.textContent=count;
+  }
+
+  function wrParseDate(s) {
+    if(!s) return new Date(0);
+    const p=s.split(/[\/\-]/);
+    if(p[0].length===4) return new Date(p[0],p[1]-1,p[2]);
+    return new Date(p[2],p[1]-1,p[0]);
+  }
+
+  function wrRenderHistory() {
+    const target=document.getElementById('wr-history-list');
+    if(!target) return;
+    const list=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]').slice(-50).reverse();
+    target.innerHTML=list.map(i=>{
+      const prefix=i.serial.startsWith('SSKM')?'SS':'MS';
+      return `<div class="wr-hist-item"><span style="font-weight:600;"><span class="wr-hist-dot" style="background:${i.status==='pending'?'#f97316':'#22c55e'}"></span>${prefix} ${i.type} — ${i.serial.substring(0,12)}</span><span style="color:#8e8e93">${i.date}</span></div>`;
+    }).join('');
+  }
+
+  function wrToggleHistory() { document.getElementById('wr-history-modal').classList.toggle('open'); wrUpdateGoal(); wrRenderHistory(); }
+
+  async function wrToggleZoom() {
+    if (!wrHtml5QrCode) return;
+    wrZoomed = !wrZoomed;
+    const btn = document.getElementById('wr-zoom-btn');
+    if (btn) { btn.textContent = wrZoomed ? '2x' : '1x'; btn.classList.toggle('on', wrZoomed); }
+    try {
+      await wrHtml5QrCode.applyVideoConstraints({ advanced: [{ zoom: wrZoomed ? 2 : 1 }] });
+    } catch(e) {
+      // Fallback to direct stream access
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const track = stream.getVideoTracks()[0];
+        if (track) await track.applyConstraints({ advanced: [{ zoom: wrZoomed ? 2 : 1 }] });
+      } catch(e2) { showToast('⚠️ Zoom not supported'); }
+    }
+  }
+
+  async function wrToggleFlash() {
+    wrTorchOn = !wrTorchOn;
+    const btn = document.getElementById('wr-flash-btn');
+    if (btn) btn.classList.toggle('on', wrTorchOn);
+    try {
+      // Try applyVideoConstraints first (html5-qrcode official API)
+      await wrHtml5QrCode.applyVideoConstraints({ advanced: [{ torch: wrTorchOn }] });
+    } catch(e) {
+      try {
+        // Fallback: get track from running stream
+        const capabilities = wrHtml5QrCode.getRunningTrackSettings && wrHtml5QrCode.getRunningTrackSettings();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', torch: wrTorchOn } });
+        const track = stream.getVideoTracks()[0];
+        if (track) await track.applyConstraints({ advanced: [{ torch: wrTorchOn }] });
+      } catch(e2) {
+        showToast(wrTorchOn ? '⚠️ Torch not supported on this device' : '');
+        wrTorchOn = !wrTorchOn;
+        if (btn) btn.classList.toggle('on', wrTorchOn);
+      }
+    }
+  }
+
+  function wrStartScanner() {
+    wrHtml5QrCode = new Html5Qrcode('wr-reader');
+    wrHtml5QrCode.start({facingMode:'environment'},{fps:25,qrbox:(vw,vh)=>({width:Math.floor(vw*0.9),height:Math.floor(vh*0.85)})},
+      text=>{ const up=text.trim().toUpperCase(); if(up.startsWith('KM')||up.startsWith('SSKM')){document.getElementById('wr-serial').value=up;wrHandleSerial();if(navigator.vibrate)navigator.vibrate(50);} }
+    ).catch(e=>console.log('Camera error',e));
+  }
+
+  // Load saved sync time
+  const savedWrTime = localStorage.getItem(WR_LS_TIME);
+  if (savedWrTime) {
+    const el=document.getElementById('wr-sync-time'); if(el) el.textContent=savedWrTime;
+    const elh=document.getElementById('wr-sync-time-h'); if(elh) elh.textContent=savedWrTime;
+  }
+  wrUpdatePendingUI();
+  
+  // ── Voice Recognition ─────────────────────────────────────────────────────
+  let svcVoiceActive = false;
+  let svcVoiceRecognition = null;
+  let svcVoiceTargetId = null;
+
+  function startSvcVoice(targetId, lang) {
+    // Stop if already active
+    if (svcVoiceActive) {
+      try { if (svcVoiceRecognition) svcVoiceRecognition.abort(); } catch(e) {}
+      svcVoiceActive = false;
+      document.querySelectorAll('.voice-btn').forEach(b => b.classList.remove('listening'));
+      showToast('🎤 Stopped');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('⚠️ Voice not supported on this device');
+      return;
+    }
+
+    svcVoiceTargetId = targetId;
+    svcVoiceActive = true;
+
+    try {
+      svcVoiceRecognition = new SpeechRecognition();
+      svcVoiceRecognition.lang = lang;
+      svcVoiceRecognition.continuous = true;
+      svcVoiceRecognition.interimResults = false;
+      svcVoiceRecognition.maxAlternatives = 1;
+
+      svcVoiceRecognition.onstart = function() {
+        document.querySelectorAll('.voice-btn').forEach(b => b.classList.add('listening'));
+        showToast('🎤 Listening... tap again to stop');
+      };
+
+      svcVoiceRecognition.onresult = function(e) {
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) transcript += e.results[i][0].transcript;
+        }
+        if (transcript) {
+          const el = document.getElementById(svcVoiceTargetId);
+          if (el) {
+            el.value = (el.value ? el.value + ' ' : '') + transcript;
+            el.dispatchEvent(new Event('input'));
+          }
+        }
+      };
+
+      svcVoiceRecognition.onerror = function(e) {
+        svcVoiceActive = false;
+        document.querySelectorAll('.voice-btn').forEach(b => b.classList.remove('listening'));
+        if (e.error === 'not-allowed') {
+          showToast('⚠️ Microphone permission denied');
+        } else if (e.error === 'no-speech') {
+          showToast('⚠️ No speech detected');
+        } else if (e.error === 'network') {
+          showToast('⚠️ Voice needs internet connection');
+        } else {
+          showToast('⚠️ Voice error: ' + e.error);
+        }
+      };
+
+      svcVoiceRecognition.onend = function() {
+        svcVoiceActive = false;
+        document.querySelectorAll('.voice-btn').forEach(b => b.classList.remove('listening'));
+      };
+
+      svcVoiceRecognition.start();
+
+    } catch(e) {
+      svcVoiceActive = false;
+      showToast('⚠️ Could not start voice: ' + e.message);
+    }
+  }
+
+</script>
+</body>
+</html>

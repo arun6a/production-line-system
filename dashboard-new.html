@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Kutty Machines Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { 
+            --bg: #f2f2f7; 
+            --surface: #ffffff; 
+            --blue: #007aff; 
+            --text: #1c1c1e; 
+            --sub: #8e8e93; 
+            --border: #e5e5ea;
+            --color-wiring: #ff9500;
+            --color-assembly: #5ac8fa;
+            --color-dispatch: #5856d6;
+            --color-pickup: #34c759;
+            --color-error: #ff3b30;
+            --color-success: #34c759;
+            --color-warning: #ff9500;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 0; 
+            color: var(--text); 
+            overflow-x: hidden; 
+            padding-bottom: calc(90px + var(--safe-bottom));
+            position: relative;
+            padding-top: 12px; 
+        }
+
+        body.banner-active { padding-top: 70px; } 
+
+        /* --- BACKGROUND --- */
+        #bg-image-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center; background-attachment: fixed;
+            z-index: -2; opacity: 0; transition: opacity 0.5s ease;
+        }
+        #bg-overlay-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.2); z-index: -1; opacity: 0; transition: opacity 0.5s ease;
+        }
+        body.has-custom-bg #bg-image-layer { opacity: 1; }
+        body.has-custom-bg #bg-overlay-layer { opacity: 1; }
+
+        /* --- GLASSMORPHISM --- */
+        body.has-custom-bg .card, body.has-custom-bg .list-wrap, body.has-custom-bg .pipe-item,
+        body.has-custom-bg .prev-day-card, body.has-custom-bg .filter-btn, body.has-custom-bg .range-picker,
+        body.has-custom-bg #search-box, body.has-custom-bg .chart-card, body.has-custom-bg .alert-item,
+        body.has-custom-bg .detail-row, body.has-custom-bg .history-item, body.has-custom-bg #goal-banner,
+        body.has-custom-bg .stock-table {
+            background: rgba(255, 255, 255, 0.8) !important; 
+            backdrop-filter: blur(12px) saturate(180%);
+            -webkit-backdrop-filter: blur(12px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.5) !important; color: #000 !important;
+        }
+        body.has-custom-bg .card label, body.has-custom-bg .pipe-label, body.has-custom-bg .prev-day-title, body.has-custom-bg .header-sub, body.has-custom-bg .alert-meta { color: rgba(0,0,0,0.6) !important; }
+        body.has-custom-bg .prev-day-card { background: rgba(28, 28, 30, 0.8) !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+        body.has-custom-bg .prev-day-title, body.has-custom-bg .mini-item { color: #fff !important; }
+        body.has-custom-bg .mini-item:active { background: rgba(255,255,255,0.1); }
+        body.has-custom-bg .bottom-nav { background: rgba(255, 255, 255, 0.85) !important; backdrop-filter: blur(15px); }
+        body.has-custom-bg .header h1 { color: #000; }
+        body.has-custom-bg .panel { background: rgba(242, 242, 247, 0.9) !important; backdrop-filter: blur(20px); }
+        body.has-custom-bg #notif-panel { background: rgba(242, 242, 247, 0.9) !important; backdrop-filter: blur(20px); }
+        body.has-custom-bg .modal { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.5); }
+        body.has-custom-bg .notif-bell { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.1); }
+
+        /* --- Loading Overlay --- */
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.98); z-index: 50000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.3s ease;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e1e1e1; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- Goal Banners --- */
+        #goal-banner { display: none; position: fixed; top: 12px; left: 0; width: 100%; padding: 12px 20px; border-radius: 0; color: white; font-weight: 700; font-size: 13px; text-align: center; z-index: 25000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 0; border: none; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .banner-success { background: linear-gradient(135deg, #34c759, #30d158); }
+        .banner-fail { background: linear-gradient(135deg, #ff3b30, #ff453a); }
+
+        /* --- Progress Bars --- */
+        .progress-bars-container { position: fixed; top: 0; left: 0; width: 100%; display: flex; flex-direction: column; z-index: 20000; background: var(--border); }
+        .progress-row { height: 4px; width: 100%; background: transparent; position: relative; }
+        .progress-fill { height: 100%; width: 0%; transition: width 1.5s cubic-bezier(0.1, 0, 0, 1); }
+        .fill-dispatch { background: var(--color-dispatch); box-shadow: 0 0 8px rgba(88, 86, 214, 0.4); }
+        .fill-wiring { background: var(--color-wiring); box-shadow: 0 0 8px rgba(255, 149, 0, 0.4); }
+        .fill-assembly { background: var(--color-assembly); box-shadow: 0 0 8px rgba(90, 200, 250, 0.4); }
+
+        /* --- Layout --- */
+        #main-view { padding: 20px; padding-top: 25px; max-width: 600px; margin: 0 auto; }
+        #analytics-view { padding: 20px; padding-top: 25px; display: none; max-width: 1400px; margin: 0 auto; }
+        #stock-view { padding: 20px; padding-top: 25px; display: none; max-width: 800px; margin: 0 auto; }
+        
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .header-left { display: flex; flex-direction: column; gap: 5px; }
+        .header-top-row { display: flex; align-items: center; gap: 10px; }
+        .header-logo { height: 32px; width: auto; border-radius: 6px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0; font-weight: 800; letter-spacing: -0.5px; font-size: 22px; color: var(--text); user-select: none; }
+        .header-sub { font-size: 12px; color: var(--sub); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .btn { background: var(--blue); color: white; border: none; padding: 8px 12px; border-radius: 12px; font-weight: 600; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-sec { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .btn:active { transform: scale(0.96); }
+        .sync-container { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .sync-time-text { font-size: 9px; color: var(--sub); font-weight: 500; }
+
+        /* --- Notif Bell --- */
+        .notif-bell { background: var(--surface); border: 1px solid var(--border); width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; font-size: 16px; }
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--color-error); color: white; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); animation: badgePop 0.3s ease; }
+        @keyframes badgePop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+        /* --- Notif Panel --- */
+        #notif-panel { position: fixed; top: 0; right: 0; width: 100%; max-width: 350px; height: 100%; background: var(--bg); z-index: 60000; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: -10px 0 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+        #notif-panel.active { transform: translateX(0); }
+        .notif-header { padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .notif-title { font-size: 16px; font-weight: 800; }
+        .notif-actions { display: flex; gap: 12px; align-items: center; }
+        .notif-mark-read { background: none; border: none; color: var(--blue); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 8px; }
+        .notif-close { background: none; border: none; color: var(--blue); font-size: 14px; font-weight: 700; cursor: pointer; padding: 8px; }
+        .notif-content { padding: 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        .alert-item { background: var(--surface); border-radius: 12px; padding: 14px; border-left: 4px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        .alert-positive { border-left-color: #34c759; }
+        .alert-warning { border-left-color: #ff9500; }
+        .alert-critical { border-left-color: #ff3b30; }
+        .alert-info { border-left-color: #5ac8fa; }
+        .alert-stage { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+        .stage-wiring { background: rgba(255,149,0,0.15); color: var(--color-wiring); }
+        .stage-assembly { background: rgba(90,200,250,0.15); color: var(--color-assembly); }
+        .stage-dispatch { background: rgba(88,86,214,0.15); color: var(--color-dispatch); }
+        .stage-overall { background: rgba(142,142,147,0.15); color: var(--sub); }
+        .alert-message { font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text); }
+        .alert-meta { font-size: 10px; color: var(--sub); margin-top: 6px; }
+
+        /* --- Pipeline Card --- */
+        .pipeline-card { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .pipe-item { background: white; border-radius: 16px; padding: 12px; text-align: center; border: 1px solid var(--border); position: relative; overflow: hidden; transition: all 0.2s; cursor: pointer; }
+        .pipe-item.active { border-width: 2px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .pipe-label { font-size: 9px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: var(--sub); }
+        .pipe-count { font-size: 24px; font-weight: 900; }
+        .pipe-wiring.active { border-color: var(--color-wiring); color: var(--color-wiring); }
+        .pipe-assembly.active { border-color: var(--color-assembly); color: var(--color-assembly); }
+        .pipe-dispatch.active { border-color: var(--color-dispatch); color: var(--color-dispatch); }
+
+        /* --- Stats Grid --- */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        @media (min-width: 768px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } .stats-grid.special-goals { grid-template-columns: 1fr; gap: 12px; } }
+        .card { background: white; padding: 15px; border-radius: 18px; border: 1px solid var(--border); cursor: default; }
+        .card label { font-size: 8px; font-weight: 800; color: var(--sub); text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .card b { font-size: 18px; }
+        .card-progress-wrap { display: flex; align-items: baseline; gap: 5px; }
+        .goal-text { font-size: 12px; color: var(--sub); font-weight: 600; }
+        .card-progress-bar { margin-top: 10px; width: 100%; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
+        .card-progress-fill { height: 100%; width: 0%; transition: width 1.5s cubic-bezier(0.1, 0, 0, 1); }
+
+        /* --- Prev Day Card --- */
+        .prev-day-card { background: #1c1c1e; color: white; border-radius: 20px; margin-bottom: 15px; overflow: hidden; }
+        .prev-day-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .prev-day-title { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #8e8e93; }
+        .prev-day-toggle { font-size: 9px; color: var(--blue); font-weight: 700; }
+        .prev-day-list-wrap { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; background: #2c2c2e; }
+        .prev-day-list-wrap.expanded { max-height: 2000px; }
+        .mini-item { display: flex; justify-content: space-between; font-size: 11px; padding: 8px 15px; border-bottom: 1px solid #333; align-items: center; cursor: pointer; }
+        .mini-item:active { background: #383838; }
+        .mini-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+
+        /* --- STOCK ROOM VIEW --- */
+        .stock-header-info { display: flex; flex-direction: column; gap: 5px; padding: 15px; background: var(--surface); border-radius: 16px; margin-bottom: 15px; border: 1px solid var(--border); }
+        .stock-legend { display: flex; gap: 15px; font-size: 11px; font-weight: 600; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        .stock-table { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; width: 100%; }
+        .stock-row {
+            display: grid; 
+            grid-template-columns: 1.4fr 0.5fr 0.6fr 1fr 0.6fr 1.2fr; 
+            padding: 12px 8px; border-bottom: 1px solid var(--bg); align-items: center; font-size: 12px;
+        }
+        .stock-row.head { background: #f9f9f9; font-weight: 800; font-size: 9px; color: var(--sub); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .stock-row:last-child { border-bottom: none; }
+        
+        .stock-val { text-align: center; font-weight: 700; }
+        .stock-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .status-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .status-ok { background: rgba(52, 199, 89, 0.15); color: var(--color-success); }
+        .status-restock { background: rgba(255, 59, 48, 0.15); color: var(--color-error); }
+        
+        /* --- Filters & List --- */
+        .filter-scroll { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .filter-btn { background: var(--surface); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+        .filter-btn.active { background: var(--text); color: white; border-color: var(--text); }
+        .range-picker { background: var(--surface); padding: 10px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 12px; display: flex; gap: 8px; align-items: flex-end; }
+        .input-group { display: flex; flex-direction: column; flex: 1; }
+        input[type="date"] { border: 1px solid var(--border); border-radius: 6px; padding: 6px; font-size: 12px; width: 100%; background: #fafafa; }
+        #search-box { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 12px; outline: none; font-size: 14px; background: var(--surface); }
+        .list-wrap { background: var(--surface); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+        .item { padding: 14px; border-bottom: 1px solid var(--bg); cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+        .tag { font-size: 8px; font-weight: 800; padding: 3px 6px; border-radius: 4px; color: white; text-transform: uppercase; margin-right: 4px; }
+        .tag-row { margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+        .machine-tag { color: white; }
+        .dealer-tag { background: #ff9500; }
+        .export-tag { background: #ff2d55; }
+        .pickup-tag { background: var(--color-pickup); }
+        .error-tag { background: var(--color-error); }
+        .item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .cust-name { font-size: 15px; font-weight: 700; line-height: 1.2; }
+        .item-date { font-size: 11px; color: var(--blue); font-weight: 700; }
+        .item-meta { font-size: 12px; color: var(--sub); font-weight: 600; display: flex; align-items: center; }
+        .serial-tag { font-family: monospace; background: #f0f0f5; padding: 2px 4px; border-radius: 4px; margin-right: 6px; font-size: 11px; }
+
+        /* --- Charts & Nav --- */
+        .charts-container { display: grid; grid-template-columns: 1fr; gap: 15px; padding-bottom: 20px; }
+        @media (min-width: 800px) { .charts-container { grid-template-columns: 1fr 1fr; } }
+        @media (min-width: 1200px) { .charts-container { grid-template-columns: 1fr 1fr 1fr; } }
+        .chart-card { background: var(--surface); padding: 16px; border-radius: 16px; border: 1px solid var(--border); }
+        .chart-title { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 10px; text-transform: uppercase; }
+        .chart-wrapper { position: relative; height: 220px; width: 100%; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(60px + var(--safe-bottom)); background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px; z-index: 40000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--sub); font-size: 10px; font-weight: 600; cursor: pointer; width: 60px; }
+        .nav-item.active { color: var(--blue); }
+        .nav-icon { font-size: 24px; margin-bottom: 2px; }
+
+        .panel { position: fixed; top: 0; right: 0; width: 100%; max-width: 400px; height: 100%; background: var(--bg); z-index: 50000; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: -10px 0 40px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .panel.active { transform: translateX(0); }
+        .panel-header { padding: 16px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .close-btn { background: none; border: none; color: var(--blue); font-size: 16px; font-weight: 600; cursor: pointer; }
+        .panel-content { padding: 20px; overflow-y: auto; flex: 1; }
+        .detail-row { margin-bottom: 16px; background: var(--surface); padding: 16px; border-radius: 14px; border: 1px solid var(--border); }
+        .detail-label { font-size: 10px; font-weight: 800; color: var(--sub); text-transform: uppercase; margin-bottom: 6px; display: block; }
+        .detail-value { font-size: 16px; font-weight: 700; word-break: break-word; }
+        .history-list { margin-top: 10px; }
+        .history-item { background: #f9f9f9; padding: 8px; border-radius: 8px; margin-bottom: 6px; font-size: 11px; display: flex; justify-content: space-between; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 49999; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(2px); }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+
+        /* Modal */
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; width: 85%; max-width: 350px; z-index: 60000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: none; }
+        .modal input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin: 8px 0; font-size: 16px; text-align: center; }
+        .modal-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 5px; }
+        .modal-cancel { background: #eee; color: #333; }
+        .modal-submit { background: var(--blue); color: white; }
+        .modal-divider { border-top: 1px solid #eee; margin: 15px 0; padding-top: 10px; }
+        .modal-divider-title { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; text-align: center; }
+        .modal-label { font-size: 11px; font-weight: 700; color: #555; text-align: left; display: block; margin-top: 5px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .history-table th { text-align: left; padding: 8px 4px; border-bottom: 2px solid var(--border); color: var(--sub); font-size: 10px; text-transform: uppercase; }
+        .history-table td { padding: 10px 4px; border-bottom: 1px solid var(--bg); }
+        .history-table tr:last-child td { border-bottom: none; }
+        .status-success { background: rgba(52, 199, 89, 0.15); color: var(--color-success); }
+        .status-fail { background: rgba(255, 59, 48, 0.15); color: var(--color-error); }
+
+        /* --- TABLET OPTIMIZATION --- */
+        @media (min-width: 768px) {
+            .bottom-nav { display: flex; } 
+            body { padding-bottom: calc(70px + var(--safe-bottom)); }
+            .header h1 { font-size: 28px; }
+            .header-sub { font-size: 14px; }
+            .pipe-label { font-size: 11px; }
+            .pipe-count { font-size: 30px; }
+            .card label { font-size: 10px; }
+            .card b { font-size: 22px; }
+            .goal-text { font-size: 14px; }
+            .btn { font-size: 13px; padding: 10px 16px; }
+            .filter-btn { font-size: 13px; padding: 8px 18px; }
+            .cust-name { font-size: 18px; }
+            .item-meta { font-size: 14px; }
+            .serial-tag { font-size: 13px; }
+            .item-date { font-size: 13px; }
+            .tag { font-size: 9px; }
+            .prev-day-title { font-size: 12px; }
+            .prev-day-toggle { font-size: 11px; }
+            .mini-item { font-size: 13px; }
+            #main-view { max-width: 900px; padding-top: 30px; }
+            .dashboard-top-section { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; margin-bottom: 20px; }
+            .pipeline-card { margin-bottom: 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+            .pipe-item { padding: 15px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+            .pipe-label { margin-bottom: 0; }
+            .stats-grid:not(.special-goals) { grid-template-columns: repeat(4, 1fr); }
+            .prev-day-card { margin-bottom: 20px; }
+            .chart-wrapper { height: 320px; }
+            .chart-title { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bg-image-layer"></div>
+    <div id="bg-overlay-layer"></div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div style="margin-top:15px; font-weight:600; color:var(--sub);">Syncing...</div>
+    </div>
+
+    <div id="goal-banner"></div>
+
+    <div class="progress-bars-container">
+        <div class="progress-row"><div id="progress-dispatch" class="progress-fill fill-dispatch"></div></div>
+        <div class="progress-row"><div id="progress-assembly" class="progress-fill fill-assembly"></div></div>
+        <div class="progress-row"><div id="progress-wiring" class="progress-fill fill-wiring"></div></div>
+    </div>
+
+    <div id="panel-overlay" class="overlay" onclick="closePanel()"></div>
+    <div id="notif-overlay" class="overlay" onclick="toggleNotifPanel(false)"></div>
+
+    <!-- Password Modal -->
+    <div id="modal-password" class="modal">
+        <h3 style="margin:0 0 10px 0; text-align:center;">Authentication Required</h3>
+        <p style="font-size:12px; color:var(--sub); text-align:center;">Enter password to view source files.</p>
+        <input type="password" id="password-input" placeholder="Password">
+        <button class="modal-btn modal-cancel" onclick="closeModal('modal-password')">Cancel</button>
+        <button class="modal-btn modal-submit" onclick="checkPassword()">Unlock</button>
+    </div>
+
+    <!-- Goal Edit Modal -->
+    <div id="modal-goal" class="modal">
+        <h3 style="margin:0 0 15px 0; text-align:center;">Set Goals</h3>
+        
+        <label class="modal-label">Monthly Dispatch Goal</label>
+        <input type="number" id="goal-dispatch-input" placeholder="e.g. 100">
+        
+        <label class="modal-label">Weekly Wiring Goal</label>
+        <input type="number" id="goal-wiring-input" placeholder="Default: 35">
+        
+        <label class="modal-label">Weekly Assembly Goal</label>
+        <input type="number" id="goal-assembly-input" placeholder="Default: 30">
+        
+        <button class="modal-btn modal-cancel" style="margin-top:15px;" onclick="closeModal('modal-goal')">Cancel</button>
+        <button class="modal-btn modal-submit" onclick="saveGoals()">Save</button>
+    </div>
+
+    <!-- Source Links Modal -->
+    <div id="modal-sources" class="modal">
+        <h3 style="margin:0 0 15px 0; text-align:center;">Source Files</h3>
+        <a href="https://docs.google.com/spreadsheets/d/15Kj3Dw073HjuK54uYOEq4kn-04SeSOUqHydgZetDphI" target="_blank" class="modal-btn modal-submit" style="display:block; text-decoration:none; margin-bottom:8px; background:var(--color-dispatch);">Dispatch Sheet</a>
+        <a href="https://docs.google.com/spreadsheets/d/19y16Nu7GdYPN0DdTZId2bfoBn4jSmV5ZVHXSkdDdcRY" target="_blank" class="modal-btn modal-submit" style="display:block; text-decoration:none; margin-bottom:8px; background:var(--color-wiring);">Wiring Sheet</a>
+        <a href="https://docs.google.com/spreadsheets/d/1vYAuJxLY3DXoTf_5Pbvin1zwA6L8N4pNOhy180ag4p0" target="_blank" class="modal-btn modal-submit" style="display:block; text-decoration:none; background:var(--color-assembly);">Assembly Sheet</a>
+        
+        <div class="modal-divider">
+            <div class="modal-divider-title">Customization</div>
+            <input type="file" id="bg-input" accept="image/*" style="display:none;">
+            <button class="modal-btn modal-submit" style="background:#34c759;" onclick="document.getElementById('bg-input').click()">Set Background Image</button>
+            <button class="modal-btn modal-cancel" style="margin-top:8px; background:#eee; color:#333;" onclick="resetBackground()">Reset Background</button>
+        </div>
+
+        <button class="modal-btn modal-cancel" style="margin-top:15px;" onclick="closeModal('modal-sources')">Close</button>
+    </div>
+
+    <!-- Notification Panel -->
+    <div id="notif-panel">
+        <div class="notif-header">
+            <span class="notif-title">Alerts & Insights</span>
+            <div class="notif-actions">
+                <button class="notif-mark-read" onclick="markAllRead()">Mark as Read</button>
+                <button class="notif-close" onclick="toggleNotifPanel(false)">Done</button>
+            </div>
+        </div>
+        <div class="notif-content" id="notif-content"></div>
+    </div>
+
+    <main id="main-view">
+        <header class="header">
+            <div class="header-left">
+                <div class="header-top-row">
+                    <img src="https://raw.githubusercontent.com/arun6a/Km-production-sales-/e0c9341ecf32ff2f30ddca836f35fd7fc8363c53/logo.png" class="header-logo" alt="Logo">
+                    <h1 id="main-header">Kutty Machines</h1>
+                </div>
+                <div class="header-sub">Sales & Production Dashboard</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-sec" onclick="openModal('modal-password')">Sources</button>
+                
+                <div class="sync-container">
+                    <button class="btn" onclick="fetchData()">Sync</button>
+                    <span id="sync-time-display" class="sync-time-text"></span>
+                </div>
+
+                <div class="notif-bell" onclick="toggleNotifPanel(true)">
+                    <span>🔔</span>
+                    <div class="notif-badge" id="notif-badge" style="display:none;">0</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard-top-section">
+            <div class="pipeline-card">
+                <div class="pipe-item pipe-dispatch active" onclick="setStage('dispatch', this)">
+                    <div class="pipe-label">Dispatch</div>
+                    <div class="pipe-count" id="today-dispatch-val">0</div>
+                </div>
+                <div class="pipe-item pipe-assembly" onclick="setStage('assembly', this)">
+                    <div class="pipe-label">Assembly</div>
+                    <div class="pipe-count" id="today-assembly-val">0</div>
+                </div>
+                <div class="pipe-item pipe-wiring" onclick="setStage('wiring', this)">
+                    <div class="pipe-label">Wiring</div>
+                    <div class="pipe-count" id="today-wiring-val">0</div>
+                </div>
+            </div>
+
+            <div class="stats-grid special-goals">
+                <div class="card">
+                    <label>Monthly Sales</label>
+                    <div class="card-progress-wrap">
+                       <b id="monthly-sales-val" style="color:var(--color-dispatch)">0</b>
+                       <span class="goal-text" id="monthly-goal-text">/ 0 Goal</span>
+                    </div>
+                    <div class="card-progress-bar"><div id="card-dispatch-progress" class="card-progress-fill" style="background:var(--color-dispatch);"></div></div>
+                </div>
+                <div class="card" onclick="showGoalHistory('wiring')" style="cursor:pointer;">
+                    <label>Wiring Goal (Weekly)</label>
+                    <div class="card-progress-wrap">
+                       <b id="weekly-wiring-val" style="color:var(--color-wiring)">0</b>
+                       <span class="goal-text" id="wiring-goal-text">/ 0 Goal</span>
+                    </div>
+                    <div class="card-progress-bar"><div id="card-wiring-progress" class="card-progress-fill" style="background:var(--color-wiring);"></div></div>
+                </div>
+                <div class="card" onclick="showGoalHistory('assembly')" style="cursor:pointer;">
+                    <label>Assembly Goal (Weekly)</label>
+                    <div class="card-progress-wrap">
+                       <b id="weekly-assembly-val" style="color:var(--color-assembly)">0</b>
+                       <span class="goal-text" id="assembly-goal-text">/ 0 Goal</span>
+                    </div>
+                    <div class="card-progress-bar"><div id="card-assembly-progress" class="card-progress-fill" style="background:var(--color-assembly);"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="prev-day-card">
+            <div class="prev-day-header" onclick="togglePrevDay()">
+                <span class="prev-day-title">PREVIOUS WORKDAY: Scanning...</span>
+                <span class="prev-day-toggle">▼ EXPAND</span>
+            </div>
+            <div id="prev-day-list" class="prev-day-list-wrap"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="card" onclick="showPendingAssembly()" style="cursor:pointer;">
+                <label>Pending Assembly</label>
+                <div class="card-progress-wrap">
+                   <b id="pending-assembly-count" style="color:var(--color-error)">0</b>
+                   <span class="goal-text">Last 20 Days</span>
+                </div>
+            </div>
+            <div class="card"><label>Total Production</label><b id="total-production-val" style="color:var(--color-assembly)">0</b></div>
+            <div class="card"><label>6M Best Day</label><b id="best-day-val">0</b></div>
+            <div class="card"><label>6M Best Month</label><b id="best-month-val">0</b></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="card"><label>SS Units</label><b id="ss-count" style="color:var(--color-dispatch)">0</b></div>
+            <div class="card"><label>MS Units</label><b id="ms-count" style="color:var(--color-assembly)">0</b></div>
+        </div>
+
+        <div class="filter-scroll">
+            <button class="filter-btn active" id="default-filter" onclick="applyFilter('today', this)">Today</button>
+            <button class="filter-btn" onclick="applyFilter('yesterday', this)">Yesterday</button>
+            <button class="filter-btn" onclick="applyFilter('2days', this)">2 Days Ago</button>
+            <button class="filter-btn" onclick="applyFilter('week', this)">This Week</button>
+            <button class="filter-btn" onclick="applyFilter('lastweek', this)">Last Week</button>
+            <button class="filter-btn" onclick="applyFilter('month', this)">This Month</button>
+            <button class="filter-btn" onclick="applyFilter('lastmonth', this)">Last Month</button>
+            <button class="filter-btn" onclick="applyFilter('all', this)">All Time</button>
+        </div>
+
+        <div class="range-picker">
+            <div class="input-group"><label>From</label><input type="date" id="range-start"></div>
+            <div class="input-group"><label>To</label><input type="date" id="range-end"></div>
+            <button class="btn" style="padding: 6px 10px;" onclick="applyCustomRange()">Go</button>
+        </div>
+
+        <input type="text" id="search-box" placeholder="Search serial, invoice, customer..." oninput="doSearch()">
+        <div id="list-target" class="list-wrap"></div>
+    </main>
+
+    <!-- STOCK ROOM VIEW -->
+    <main id="stock-view">
+        <header class="header">
+            <div class="header-left">
+                <h1>Stock Room</h1>
+                <div class="header-sub">Live Inventory Status</div>
+            </div>
+            <div class="header-actions">
+                <div class="sync-container">
+                    <button class="btn" onclick="fetchData()">Sync</button>
+                    <span id="sync-time-display-stock" class="sync-time-text"></span>
+                </div>
+            </div>
+        </header>
+
+        <div class="stock-header-info">
+            <div style="font-size:12px; color:var(--text); font-weight:700;">Formula:</div>
+            <div style="font-size:11px; color:var(--sub);">
+                Prepare = Min - (Ready + Ready Frame + Pending for Assembly)
+            </div>
+        </div>
+        
+        <div class="stock-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--color-success)"></div>OK</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--color-error)"></div>Prepare</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--color-warning)"></div>Pending</div>
+        </div>
+
+        <div style="margin-top:15px;">
+            <div class="stock-table">
+                <div class="stock-row head">
+                    <span>Machine</span>
+                    <span class="stock-val">Min</span>
+                    <span class="stock-val">Ready</span>
+                    <span class="stock-val">Ready Frame</span>
+                    <span class="stock-val">Pending</span>
+                    <span class="stock-val">Action</span>
+                </div>
+                <div id="stock-list">
+                    <div class="stock-row"><div class="stock-name">Loading...</div></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main id="analytics-view">
+        <header class="header">
+            <h1>Advanced Analytics</h1>
+        </header>
+        <div class="charts-container" id="charts-wrapper"></div>
+    </main>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('dashboard', this)">
+            <span class="nav-icon">📊</span>
+            <span>Dashboard</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('stock', this)">
+            <span class="nav-icon">📦</span>
+            <span>Stock</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('analytics', this)">
+            <span class="nav-icon">📈</span>
+            <span>Analytics</span>
+        </div>
+    </nav>
+
+    <aside id="side-panel" class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Details</span>
+            <button class="close-btn" onclick="closePanel()">Done</button>
+        </div>
+        <div id="detail-content" class="panel-content"></div>
+    </aside>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const CONFIG = {
+            dispatch: `https://docs.google.com/spreadsheets/d/15Kj3Dw073HjuK54uYOEq4kn-04SeSOUqHydgZetDphI/export?format=csv&gid=200741550`,
+            wiring: `https://docs.google.com/spreadsheets/d/19y16Nu7GdYPN0DdTZId2bfoBn4jSmV5ZVHXSkdDdcRY/export?format=csv`,
+            assembly: `https://docs.google.com/spreadsheets/d/1vYAuJxLY3DXoTf_5Pbvin1zwA6L8N4pNOhy180ag4p0/export?format=csv`,
+            stock: `https://docs.google.com/spreadsheets/d/1nsLwfGbA_rVtdZxn9fSzW9_2o9JAT0OGVWwrO-vv2sQ/export?format=csv&gid=0`
+        };
+
+        const DB = { wiring: [], assembly: [], dispatch: [], stock: [] };
+        const SERIAL_MAP = {}; 
+        let PENDING_ASSEMBLY_DATA = []; 
+        
+        let customerFrequency = {};
+        let machineColorMap = {}; 
+        let currentStage = 'dispatch'; 
+        let filteredData = [];
+        let chartInstances = [];
+        
+        let ACTIVE_ALERTS = [];
+        
+        const $ = (id) => document.getElementById(id);
+        const showLoading = (show) => {
+            const el = $('loading-overlay');
+            el.style.opacity = show ? '1' : '0';
+            el.style.pointerEvents = show ? 'auto' : 'none';
+        };
+
+        // ==========================================
+        // BACKGROUND LOGIC
+        // ==========================================
+        
+        const bgInput = $('bg-input');
+        bgInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 1024;
+                    const scale = maxW / img.width;
+                    canvas.width = maxW;
+                    canvas.height = img.height * scale;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const dataUrl = canvas.toDataURL('jpeg', 0.7);
+                    
+                    try {
+                        localStorage.setItem('customBg', dataUrl);
+                        applyCustomBackground(dataUrl);
+                        alert("Background set!");
+                    } catch (err) {
+                        alert("Image too large or storage full. Try a smaller image.");
+                        console.error(err);
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function applyCustomBackground(url) {
+            const body = document.body;
+            const bgLayer = $('bg-image-layer');
+            
+            if (url) {
+                bgLayer.style.backgroundImage = `url(${url})`;
+                body.classList.add('has-custom-bg');
+            } else {
+                bgLayer.style.backgroundImage = 'none';
+                body.classList.remove('has-custom-bg');
+            }
+        }
+
+        function resetBackground() {
+            localStorage.removeItem('customBg');
+            applyCustomBackground(null);
+            alert("Background reset.");
+        }
+
+        function loadBackground() {
+            const bg = localStorage.getItem('customBg');
+            if (bg) applyCustomBackground(bg);
+        }
+
+        // ==========================================
+        // NOTIFICATION LOGIC
+        // ==========================================
+        function getDismissedAlerts() {
+            try { return new Set(JSON.parse(localStorage.getItem('dismissed_alerts') || "[]")); } 
+            catch (e) { return new Set(); }
+        }
+
+        function saveDismissedAlerts(ids) {
+            try { localStorage.setItem('dismissed_alerts', JSON.stringify([...ids])); } 
+            catch (e) { console.error("Failed to save dismissed alerts", e); }
+        }
+        
+        function toggleNotifPanel(show) {
+            const panel = $('notif-panel');
+            const overlay = $('notif-overlay');
+            if(show) { panel.classList.add('active'); overlay.classList.add('active'); } 
+            else { panel.classList.remove('active'); overlay.classList.remove('active'); }
+        }
+
+        function markAllRead() {
+            const dismissed = getDismissedAlerts();
+            ACTIVE_ALERTS.forEach(a => dismissed.add(a.id));
+            saveDismissedAlerts(dismissed);
+            ACTIVE_ALERTS = [];
+            renderNotificationPanel();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if(e.key === "Escape") { closePanel(); toggleNotifPanel(false); }
+        });
+
+        // ==========================================
+        // ALERT ENGINE
+        // ==========================================
+        function generateSafeSmartAlerts() {
+            ACTIVE_ALERTS = []; const now = new Date(); const cutoff = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000); 
+            const filterRecent = (arr) => arr.filter(i => i.dateObj && i.dateObj >= cutoff && i.dateObj <= now);
+            const wData = filterRecent(DB.wiring); const aData = filterRecent(DB.assembly); const dData = filterRecent(DB.dispatch);
+            const getDailyCounts = (arr) => { const map = {}; arr.forEach(i => { const key = i.dateStr; map[key] = (map[key] || 0) + 1; }); return map; };
+            const getWeeklyCounts = (arr) => { const map = {}; arr.forEach(i => { const d = i.dateObj; const start = new Date(d); start.setDate(d.getDate() - d.getDay()); const key = start.toLocaleDateString('en-GB'); map[key] = (map[key] || 0) + 1; }); return map; };
+            const sortMapToArray = (map) => { return Object.entries(map).map(([date, count]) => ({ date, count, dateObj: parseDate(date) })).sort((a, b) => b.dateObj - a.dateObj); };
+            const wDays = sortMapToArray(getDailyCounts(wData)); const aDays = sortMapToArray(getDailyCounts(aData)); const dDays = sortMapToArray(getDailyCounts(dData));
+            const wWeeks = sortMapToArray(getWeeklyCounts(wData)); const aWeeks = sortMapToArray(getWeeklyCounts(aData)); const dWeeks = sortMapToArray(getWeeklyCounts(dData));
+            const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal();
+            processStageAlerts('wiring', wDays, wWeeks, wData.length, wGoal); processStageAlerts('assembly', aDays, aWeeks, aData.length, aGoal); processStageAlerts('dispatch', dDays, dWeeks, dData.length, 0);
+            processCrossStageAlerts(wWeeks, aWeeks, dWeeks); processTrendAlerts(wDays, aDays, dDays);
+            const priorityOrder = { critical: 0, warning: 1, positive: 2, info: 3 }; ACTIVE_ALERTS.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
+            ACTIVE_ALERTS = ACTIVE_ALERTS.slice(0, 15);
+        }
+        function processStageAlerts(stage, days, weeks, totalVol, goal) {
+            if (days.length < 7) return; const sum = (arr) => arr.reduce((a, b) => a + b, 0); const avg = (arr) => arr.length ? sum(arr) / arr.length : 0;
+            const stdDev = (arr) => { const mean = avg(arr); if (!mean) return 0; const squareDiffs = arr.map(value => Math.pow(value - mean, 2)); return Math.sqrt(avg(squareDiffs)); };
+            const stageName = stage.charAt(0).toUpperCase() + stage.slice(1); const colorClass = `stage-${stage}`;
+            const thisW = weeks[0] ? weeks[0].count : 0; const lastW = weeks[1] ? weeks[1].count : 0;
+            if (lastW > 0) { const chg = ((thisW - lastW) / lastW) * 100; if (chg >= 15) ACTIVE_ALERTS.push({ id: `${stage}-weekly-up`, message: `${stageName} up ${Math.round(chg)}% vs last week`, type: 'positive', stage: stage, stageClass: colorClass }); else if (chg <= -15) ACTIVE_ALERTS.push({ id: `${stage}-weekly-down`, message: `${stageName} down ${Math.abs(Math.round(chg))}% vs last week`, type: 'warning', stage: stage, stageClass: colorClass }); }
+            const dailyCounts = days.map(d => d.count); const avg60 = avg(dailyCounts); const todayCnt = days[0] ? days[0].count : 0;
+            if (todayCnt > avg60 * 1.5) ACTIVE_ALERTS.push({ id: `${stage}-above-avg`, message: `${stageName} above 60-day avg`, type: 'positive', stage: stage, stageClass: colorClass });
+            else if (todayCnt < avg60 * 0.5 && todayCnt > 0) ACTIVE_ALERTS.push({ id: `${stage}-below-avg`, message: `${stageName} below 60-day avg`, type: 'info', stage: stage, stageClass: colorClass });
+            const best = Math.max(...dailyCounts); const worst = Math.min(...dailyCounts.filter(x => x > 0));
+            if (todayCnt === best && best > 0) ACTIVE_ALERTS.push({ id: `${stage}-best-day`, message: `Highest ${stage} day (60d)`, type: 'positive', stage: stage, stageClass: colorClass });
+            if (todayCnt === worst && worst > 0) ACTIVE_ALERTS.push({ id: `${stage}-worst-day`, message: `Lowest ${stage} day (60d)`, type: 'warning', stage: stage, stageClass: colorClass });
+            let streak = 0; for (let i = 0; i < days.length - 1; i++) { if (days[i].count > days[i+1].count) streak++; else break; } if (streak >= 3) ACTIVE_ALERTS.push({ id: `${stage}-growth-streak`, message: `${stageName} ${streak}-day growth streak`, type: 'positive', stage: stage, stageClass: colorClass });
+            let declineStreak = 0; for (let i = 0; i < days.length - 1; i++) { if (days[i].count < days[i+1].count) declineStreak++; else break; } if (declineStreak >= 3) ACTIVE_ALERTS.push({ id: `${stage}-decline-streak`, message: `${stageName} ${declineStreak}-day decline streak`, type: 'warning', stage: stage, stageClass: colorClass });
+            const volatility = stdDev(dailyCounts); const cov = avg60 > 0 ? (volatility / avg60) * 100 : 0;
+            if (cov > 80 && dailyCounts.length > 10) ACTIVE_ALERTS.push({ id: `${stage}-volatility`, message: `High ${stageName.toLowerCase()} volatility detected`, type: 'warning', stage: stage, stageClass: colorClass });
+            if (cov < 20 && dailyCounts.length > 10 && avg60 > 2) ACTIVE_ALERTS.push({ id: `${stage}-stable`, message: `${stageName} output stable detected`, type: 'positive', stage: stage, stageClass: colorClass });
+            const sortedWeeks = [...weeks].sort((a,b) => b.count - a.count);
+            if (sortedWeeks.length > 2 && weeks[0] && sortedWeeks.slice(0,3).some(w => w.date === weeks[0].date)) ACTIVE_ALERTS.push({ id: `${stage}-top3-week`, message: `Top 3 ${stage} week`, type: 'positive', stage: stage, stageClass: colorClass });
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; const dayCounts = [0,0,0,0,0,0,0]; days.forEach(d => dayCounts[d.dateObj.getDay()] += d.count);
+            const maxDayIdx = dayCounts.indexOf(Math.max(...dayCounts));
+            if (dayCounts[maxDayIdx] > avg(dayCounts.filter((_,i) => i !== maxDayIdx)) * 1.3) ACTIVE_ALERTS.push({ id: `${stage}-best-weekday`, message: `Most productive ${stage} day: ${dayNames[maxDayIdx]}`, type: 'info', stage: stage, stageClass: colorClass });
+        }
+        function processCrossStageAlerts(wW, aW, dW) {
+            const getChange = (arr) => { if (!arr[0] || !arr[1] || arr[1].count === 0) return 0; return ((arr[0].count - arr[1].count) / arr[1].count) * 100; };
+            const wChg = getChange(wW); const aChg = getChange(aW); const dChg = getChange(dW);
+            if (wChg > 0 && aChg > 0 && dChg > 0) ACTIVE_ALERTS.push({ id: 'all-improved', message: `All stages improved vs last week`, type: 'positive', stage: 'overall', stageClass: 'stage-overall' });
+            if (wChg < 0 && aChg < 0 && dChg < 0) ACTIVE_ALERTS.push({ id: 'all-declined', message: `All stages declined vs last week`, type: 'critical', stage: 'overall', stageClass: 'stage-overall' });
+            const totalThis = (wW[0]?.count || 0) + (aW[0]?.count || 0) + (dW[0]?.count || 0); const totalLast = (wW[1]?.count || 0) + (aW[1]?.count || 0) + (dW[1]?.count || 0);
+            if (totalThis > 0 && totalLast > 0) { const overallChg = ((totalThis - totalLast) / totalLast) * 100; if (overallChg >= 20) ACTIVE_ALERTS.push({ id: 'strong-week', message: `Strong overall week (+${Math.round(overallChg)}%)`, type: 'positive', stage: 'overall', stageClass: 'stage-overall' }); if (overallChg <= -20) ACTIVE_ALERTS.push({ id: 'weak-week', message: `Weak overall week (${Math.round(overallChg)}%)`, type: 'warning', stage: 'overall', stageClass: 'stage-overall' }); }
+        }
+        function processTrendAlerts(wD, aD, dD) {
+            const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+            const checkTrend = (arr, name) => { if (arr.length < 14) return; const last7 = sum(arr.slice(0, 7).map(i => i.count)); const prev7 = sum(arr.slice(7, 14).map(i => i.count)); if (prev7 === 0) return; const chg = ((last7 - prev7) / prev7) * 100; if (chg >= 25) ACTIVE_ALERTS.push({ id: `${name}-7d-strong`, message: `Last 7 days ${name} stronger (+${Math.round(chg)}%)`, type: 'positive', stage: name.toLowerCase(), stageClass: `stage-${name.toLowerCase()}` }); if (chg <= -25) ACTIVE_ALERTS.push({ id: `${name}-7d-weak`, message: `Last 7 days ${name} weaker (${Math.round(chg)}%)`, type: 'warning', stage: name.toLowerCase(), stageClass: `stage-${name.toLowerCase()}` }); };
+            checkTrend(wD, 'Wiring'); checkTrend(aD, 'Assembly'); checkTrend(dD, 'Dispatch');
+            const checkFinish = (arr, name) => { if (arr.length < 20) return; const last10 = sum(arr.slice(0, 10).map(i => i.count)); const first10 = sum(arr.slice(-10).map(i => i.count)); if (first10 === 0) return; if (last10 > first10 * 1.3) ACTIVE_ALERTS.push({ id: `${name}-strong-finish`, message: `${name} strong finish (last 10d > first 10d)`, type: 'positive', stage: name.toLowerCase(), stageClass: `stage-${name.toLowerCase()}` }); if (last10 < first10 * 0.7) ACTIVE_ALERTS.push({ id: `${name}-weak-finish`, message: `${name} weak finish detected`, type: 'warning', stage: name.toLowerCase(), stageClass: `stage-${name.toLowerCase()}` }); };
+            checkFinish(wD, 'Wiring'); checkFinish(aD, 'Assembly'); checkFinish(dD, 'Dispatch');
+        }
+        function renderNotificationPanel() {
+            const badge = $('notif-badge'); const content = $('notif-content'); const dismissed = getDismissedAlerts(); const visibleAlerts = ACTIVE_ALERTS.filter(a => !dismissed.has(a.id));
+            if (visibleAlerts.length === 0) { badge.style.display = 'none'; content.innerHTML = '<div class="alert-item"><div class="alert-message">No significant alerts.</div><div class="alert-meta">Based on last 60 days data.</div></div>'; return; }
+            badge.style.display = 'flex'; badge.innerText = visibleAlerts.length;
+            content.innerHTML = visibleAlerts.map(a => `<div class="alert-item alert-${a.type}"><span class="alert-stage ${a.stageClass}">${a.stage}</span><div class="alert-message">${a.message}</div><div class="alert-meta">Based on last 60 days</div></div>`).join('');
+        }
+
+        // ==========================================
+        // GOAL LOGIC
+        // ==========================================
+        function getWiringGoal() { return parseInt(localStorage.getItem('goal_wiring_weekly') || "35"); }
+        function getAssemblyGoal() { return parseInt(localStorage.getItem('goal_assembly_weekly') || "30"); }
+        function checkBanners() {
+            const now = new Date(); const day = now.getDay(); const dateOfMonth = now.getDate();
+            if (day === 1) { const lastW = getLastWeekCount(DB.wiring); const lastA = getLastWeekCount(DB.assembly); const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal(); if (lastW < wGoal) { showBanner('wiring', false); return; } if (lastA < aGoal) { showBanner('assembly', false); return; } }
+            if (dateOfMonth === 1 || dateOfMonth === 2) { const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1; const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(); const goalKey = `goal_${prevYear}_${prevMonth}`; const goal = parseInt(localStorage.getItem(goalKey) || "0"); const mStart = new Date(prevYear, prevMonth, 1); const mEnd = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59); const prevMonthSales = DB.dispatch.filter(i => i.dateObj >= mStart && i.dateObj <= mEnd).length; if (goal > 0 && prevMonthSales >= goal) { showBanner('monthly', true); return; } }
+            if (day === 1) { const lastW = getLastWeekCount(DB.wiring); const lastA = getLastWeekCount(DB.assembly); const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal(); if (lastW >= wGoal) { showBanner('wiring', true); return; } if (lastA >= aGoal) { showBanner('assembly', true); return; } }
+            const currW = getCurrentWeekCount(DB.wiring); const currA = getCurrentWeekCount(DB.assembly); const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal();
+            if (currW >= wGoal) { showBanner('wiring', true); return; } if (currA >= aGoal) { showBanner('assembly', true); return; } hideBanner();
+        }
+        // === GOAL BANNERS DISABLED per user request ===
+        // Original banners showed "🎉 Goal Achieved" / "⚠️ Goal Missed" messages.
+        // Now showBanner() is a no-op — banners never appear.
+        function showBanner(type, success) {
+            // Banners removed per user request — return without doing anything
+            return;
+        }
+        function hideBanner() { const el = $('goal-banner'); el.style.display = 'none'; document.body.classList.remove('banner-active'); }
+        function getWeekId(d) { const date = new Date(d); date.setHours(0,0,0,0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return date.getFullYear() + "-W" + (1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7)); }
+        function getPrevWeekId(d) { const prev = new Date(d); prev.setDate(prev.getDate() - 7); return getWeekId(prev); }
+        function getCurrentWeekCount(arr) { const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59); return arr.filter(i => i.dateObj >= start && i.dateObj <= end).length; }
+        function getLastWeekCount(arr) { const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - now.getDay() - 7); start.setHours(0,0,0,0); const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59); return arr.filter(i => i.dateObj >= start && i.dateObj <= end).length; }
+
+        // ==========================================
+        // GOAL HISTORY
+        // ==========================================
+        function showGoalHistory(stage) {
+            const historyData = getWeeklyGoalHistory(stage); const stageLabel = stage.charAt(0).toUpperCase() + stage.slice(1); const goal = stage === 'wiring' ? getWiringGoal() : getAssemblyGoal();
+            const listHtml = historyData.map(week => { const statusClass = week.count >= goal ? 'status-success' : 'status-fail'; const statusText = week.count >= goal ? 'Goal Met' : 'Below Goal'; return `<tr><td><strong>${week.label}</strong><br><span style="font-size:10px; color:var(--sub);">${week.date}</span></td><td style="text-align:center;"><strong>${week.count}</strong></td><td style="text-align:center;"><span class="status-badge ${statusClass}">${statusText}</span></td></tr>`; }).join('');
+            $('detail-content').innerHTML = `<div class="detail-row"><span class="detail-label">${stageLabel} Goal History (10 Weeks)</span><div style="margin-top:5px; font-size:11px; color:var(--sub);">Current Goal: <b>${goal}</b></div><div style="margin-top:15px; overflow-x:auto;"><table class="history-table"><thead><tr><th>Week</th><th style="text-align:center;">Count</th><th style="text-align:center;">Status</th></tr></thead><tbody>${listHtml}</tbody></table></div></div>`;
+            document.querySelector('.panel-title').innerText = `${stageLabel} Stats`; $('panel-overlay').classList.add('active'); $('side-panel').classList.add('active');
+        }
+        function getWeeklyGoalHistory(stage) { const now = new Date(); const results = []; const goal = stage === 'wiring' ? getWiringGoal() : getAssemblyGoal(); const data = DB[stage]; for(let i=0; i<10; i++) { const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() - (i * 7)); weekStart.setHours(0,0,0,0); const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6); weekEnd.setHours(23,59,59,999); const count = data.filter(item => item.dateObj >= weekStart && item.dateObj <= weekEnd).length; results.push({ label: `Week ${getWeekId(weekStart).split('-W')[1]}`, date: weekStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), count: count, goal: goal, success: count >= goal }); } return results; }
+
+        // ==========================================
+        // MODALS & INTERACTIONS
+        // ==========================================
+        function openModal(id) { $(id).style.display = 'block'; }
+        function closeModal(id) { $(id).style.display = 'none'; }
+        function checkPassword() { const pass = $('password-input').value; if (pass === "madique") { closeModal('modal-password'); openModal('modal-sources'); $('password-input').value = ''; } else { alert("Incorrect Password"); } }
+        let timer;
+        const header = $('main-header');
+        header.addEventListener('mousedown', () => { timer = setTimeout(() => { openGoalModal(); }, 800); });
+        header.addEventListener('mouseup', () => clearTimeout(timer));
+        header.addEventListener('mouseleave', () => clearTimeout(timer));
+        header.addEventListener('touchstart', () => { timer = setTimeout(() => { openGoalModal(); }, 800); });
+        header.addEventListener('touchend', () => clearTimeout(timer));
+        function openGoalModal() { const now = new Date(); const dispatchKey = `goal_${now.getFullYear()}_${now.getMonth()}`; const dispatchVal = localStorage.getItem(dispatchKey) || ""; $('goal-dispatch-input').value = dispatchVal; $('goal-wiring-input').value = localStorage.getItem('goal_wiring_weekly') || ""; $('goal-assembly-input').value = localStorage.getItem('goal_assembly_weekly') || ""; openModal('modal-goal'); }
+        function saveGoals() { const now = new Date(); const dVal = $('goal-dispatch-input').value; const wVal = $('goal-wiring-input').value; const aVal = $('goal-assembly-input').value; if(dVal) localStorage.setItem(`goal_${now.getFullYear()}_${now.getMonth()}`, dVal); if(wVal) localStorage.setItem('goal_wiring_weekly', wVal); if(aVal) localStorage.setItem('goal_assembly_weekly', aVal); closeModal('modal-goal'); updatePerformance(); updateWeeklyProgress(); updateGoalCards(); calculateLiveStock(); renderCharts(); alert("Settings Saved!"); }
+
+        // ==========================================
+        // COLOR LOGIC
+        // ==========================================
+        // === EXPANDED COLOR PALETTE (30 colors) ===
+        // Increased from 15 to 30 colors so new machines get distinct colors.
+        // Hash-based assignment below ensures stable colors per machine name.
+        const colorPalette = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', 
+            '#e74c3c', '#2ecc71', '#1abc9c', '#9b59b6', '#f1c40f', '#e67e22', 
+            '#16a085', '#8e44ad', '#2c3e50',
+            // NEW: additional distinct colors for new machines added via Add Machine
+            '#E91E63', '#00BCD4', '#FFC107', '#795548', '#607D8B', '#4CAF50',
+            '#FF5722', '#3F51B5', '#009688', '#FFEB3B', '#673AB7', '#CDDC39',
+            '#F44336', '#03A9F4', '#8BC34A'
+        ];
+        let colorIndex = 0;
+        // === HASH-BASED STABLE COLOR ASSIGNMENT ===
+        // Each machine name gets a STABLE color based on its name hash.
+        // This means: same machine = same color across syncs and app restarts.
+        // New machines get distinct colors from existing ones (no risk of color swap
+        // when data order changes).
+        function getMachineColor(machineName) {
+            if (!machineName) return '#ccc';
+            if (machineColorMap[machineName]) return machineColorMap[machineName];
+            
+            // Hash the machine name to get a stable color index
+            let hash = 0;
+            for (let i = 0; i < machineName.length; i++) {
+                hash = ((hash << 5) - hash) + machineName.charCodeAt(i);
+                hash = hash & hash; // Convert to 32-bit int
+            }
+            const idx = Math.abs(hash) % colorPalette.length;
+            const color = colorPalette[idx];
+            machineColorMap[machineName] = color;
+            return color;
+        }
+
+        // ==========================================
+        // DATA FETCHING & PARSING
+        // ==========================================
+        async function fetchData(silent = false) {
+            if(!silent) showLoading(true);
+            colorIndex = 0; machineColorMap = {};
+            try {
+                const [dRes, wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.dispatch), fetch(CONFIG.wiring), fetch(CONFIG.assembly), fetch(CONFIG.stock) ]);
+                const dText = await dRes.text(); const wText = await wRes.text(); const aText = await aRes.text(); const sText = await sRes.text();
+                DB.wiring = parseProductionSheet(wText, 'wiring');
+                DB.assembly = parseProductionSheet(aText, 'assembly');
+                DB.dispatch = parseDispatchCSV(dText);
+                DB.stock = parseBaseStockCSV(sText);
+                updatePerformance(); calculatePendingAssembly(); calculateLiveStock(); updateWeeklyProgress(); updateGoalCards(); updateWorkdayPreview(); updateMonthlyStats(); checkBanners();
+                generateSafeSmartAlerts(); renderNotificationPanel();
+                setStage('dispatch', document.querySelector('.pipe-dispatch'));
+                if($('analytics-view').style.display !== 'none') renderCharts();
+            } catch (e) { console.error(e); alert("Error fetching data."); } 
+            finally { if(!silent) showLoading(false); updateSyncTime(); scheduleNextSync(); }
+        }
+        
+        function updateSyncTime() { 
+            const now = new Date(); 
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+            const el = $('sync-time-display'); 
+            const elStock = $('sync-time-display-stock');
+            if(el) el.innerText = timeStr; 
+            if(elStock) elStock.innerText = timeStr; 
+            localStorage.setItem('last_sync_timestamp', now.toISOString()); 
+        }
+        
+        function loadSyncTime() { 
+            const last = localStorage.getItem('last_sync_timestamp'); 
+            if(last) { 
+                try { 
+                    const date = new Date(last); 
+                    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const el = $('sync-time-display');
+                    const elStock = $('sync-time-display-stock');
+                    if(el) el.innerText = timeStr;
+                    if(elStock) elStock.innerText = timeStr;
+                } catch(e) {} 
+            } 
+        }
+        function scheduleNextSync() { setTimeout(() => fetchData(true), 15 * 60 * 1000); }
+
+        // ==========================================
+        // PARSING LOGIC
+        // ==========================================
+        function parseDate(s) { if (!s) return new Date(2000, 0, 1); const p = s.toString().split(/[\/\-]/); if (p.length < 3) return new Date(2000, 0, 1); let date; if (p[0].length === 4) date = new Date(p[0], p[1]-1, p[2]); else date = new Date(p[2], p[1]-1, p[0]); const now = new Date(); if (date.getFullYear() < 2010 || date.getFullYear() > now.getFullYear() + 1) return new Date(2000, 0, 1); return date; }
+        function parseBaseStockCSV(text) { const rows = text.split('\n').slice(1); const data = []; rows.forEach(row => { if(!row.trim()) return; const cells = row.split(',').map(c => c.trim()); if(cells.length >= 4) { data.push({ name: cells[0], current: parseInt(cells[1]) || 0, min: parseInt(cells[2]) || 0, prepared: parseInt(cells[3]) || 0 }); } }); return data; }
+
+        function parseDispatchCSV(text) {
+            const rows = text.split('\n').slice(1); customerFrequency = {};
+            const data = rows.map((row, idx) => {
+                const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+                let fDate = null, fSerial = null, fInvoice = "N/A", names = [];
+                cells.forEach(val => { const up = val.toUpperCase(); if (up.startsWith("SSKM") || up.startsWith("KM")) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
+                if(!fSerial) return null;
+                let fCust = names.filter(n => n.includes(" ")).reduce((a,b) => a.length > b.length ? a : b, names[0] || "Unknown Customer");
+                if(fCust !== "Unknown Customer") customerFrequency[fCust] = (customerFrequency[fCust] || 0) + 1;
+                const isDataIssue = fDate && fDate.getFullYear() === 2000;
+                return { id: `dispatch-${idx}`, stage: 'dispatch', serial: fSerial, type: fSerial.startsWith("SSKM") ? 'SS' : 'MS', invoice: fInvoice, isPickup: fInvoice.match(/^\d{3,4}$/), customer: fCust, dateObj: fDate, dateStr: fDate ? fDate.toLocaleDateString('en-GB') : 'N/A', hasDateIssue: isDataIssue, raw: row.toLowerCase() };
+            }).filter(i => i !== null);
+            return data;
+        }
+
+        function parseProductionSheet(text, type) {
+            const rows = text.split('\n'); if (rows.length < 2) return []; const results = [];
+            const rawHeaders = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
+            const headers = rawHeaders.map(h => h.toLowerCase());
+            const ignoreExact = ['id', 's.no', 'sno', 'no', '#'];
+            const ignoreSubstrings = ['date', 'time', 'shift', 'operator', 'status', 'remark', 'note', 'total', 'count', 'day', 'name', 'model'];
+            const ignoreIndices = new Set(); let dateColIndex = -1;
+            headers.forEach((h, idx) => { if (!h) return; if (ignoreExact.includes(h) || ignoreSubstrings.some(k => h.includes(k))) { if (h.includes('date')) dateColIndex = idx; ignoreIndices.add(idx); } });
+            if (dateColIndex === -1 && rows[1]) { const firstRowCells = rows[1].split(','); for(let i=0; i<firstRowCells.length; i++) { if(parseDate(firstRowCells[i].replace(/"/g, ''))) { dateColIndex = i; ignoreIndices.add(i); break; } } }
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i]; if (!row.trim()) continue;
+                const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+                const dateVal = (dateColIndex !== -1 && cells[dateColIndex]) ? cells[dateColIndex] : null; const dateObj = parseDate(dateVal);
+                cells.forEach((val, idx) => {
+                    if (ignoreIndices.has(idx)) return; const serial = val.trim().toUpperCase(); if (!serial) return;
+                    let machineType = null; if (serial.startsWith("SSKM")) machineType = 'SS'; else if (serial.startsWith("KM")) machineType = 'MS';
+                    if (machineType) {
+                        const machineName = rawHeaders[idx] || 'Unknown'; const displayName = `${machineType} ${machineName}`;
+                        getMachineColor(displayName);
+                        SERIAL_MAP[serial] = displayName;
+                        results.push({ id: `${type}-${i}-${idx}`, stage: type, serial: serial, type: machineType, customer: displayName, invoice: 'N/A', dateObj: dateObj, dateStr: dateObj ? dateObj.toLocaleDateString('en-GB') : 'N/A', raw: row.toLowerCase() });
+                    }
+                });
+            }
+            return results;
+        }
+
+        // ==========================================
+        // UI UPDATES
+        // ==========================================
+        function updatePerformance() { const now = new Date(); const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(now.getMonth() - 6); const currentMKey = `${now.getMonth()}-${now.getFullYear()}`; const dayCounts = {}; const monthCounts = {}; let currentMonthTotal = 0;
+            DB.dispatch.forEach(i => { if(!i.dateObj || i.hasDateIssue) return; const mKey = `${i.dateObj.getMonth()}-${i.dateObj.getFullYear()}`; if(mKey === currentMKey) currentMonthTotal++; if(i.dateObj >= sixMonthsAgo) { dayCounts[i.dateStr] = (dayCounts[i.dateStr] || 0) + 1; monthCounts[mKey] = (monthCounts[mKey] || 0) + 1; } });
+            const bestDay = Math.max(...Object.values(dayCounts), 0); const bestMonth = Math.max(...Object.values(monthCounts), 0);
+            const customGoalKey = `goal_${now.getFullYear()}_${now.getMonth()}`; const customGoal = localStorage.getItem(customGoalKey); const goal = customGoal ? parseInt(customGoal) : (bestMonth + 1);
+            $('best-day-val').innerText = bestDay; $('best-month-val').innerText = bestMonth;
+            const pct = Math.min(Math.round((currentMonthTotal / goal) * 100), 100); $('progress-dispatch').style.width = pct + '%';
+            $('monthly-goal-text').innerText = `/ ${goal} Goal`; $('card-dispatch-progress').style.width = pct + '%'; $('monthly-sales-val').innerText = currentMonthTotal;
+        }
+        function updateGoalCards() { const now = new Date(); const startOfWeek = new Date(now); startOfWeek.setHours(0,0,0,0); startOfWeek.setDate(now.getDate() - now.getDay()); const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23,59,59,999); const countWeek = (arr) => arr.filter(i => i.dateObj >= startOfWeek && i.dateObj <= endOfWeek).length;
+            const wCount = countWeek(DB.wiring); const aCount = countWeek(DB.assembly); const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal();
+            $('weekly-wiring-val').innerText = wCount; $('wiring-goal-text').innerText = `/ ${wGoal} Goal`; const wPct = Math.min((wCount / wGoal) * 100, 100); $('card-wiring-progress').style.width = wPct + '%';
+            $('weekly-assembly-val').innerText = aCount; $('assembly-goal-text').innerText = `/ ${aGoal} Goal`; const aPct = Math.min((aCount / aGoal) * 100, 100); $('card-assembly-progress').style.width = aPct + '%';
+        }
+        function updateWeeklyProgress() { const now = new Date(); const startOfWeek = new Date(now); startOfWeek.setHours(0,0,0,0); startOfWeek.setDate(now.getDate() - now.getDay()); const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23,59,59,999); const countWeek = (arr) => arr.filter(i => i.dateObj >= startOfWeek && i.dateObj <= endOfWeek).length; const wCount = countWeek(DB.wiring); const aCount = countWeek(DB.assembly); const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal();
+            const wPct = Math.min((wCount / wGoal) * 100, 100); const aPct = Math.min((aCount / aGoal) * 100, 100); $('progress-wiring').style.width = wPct + '%'; $('progress-assembly').style.width = aPct + '%';
+        }
+        function updateMonthlyStats() { const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); const countRange = (arr) => arr.filter(i => i.dateObj >= mStart && i.dateObj <= mEnd).length; $('total-production-val').innerText = countRange(DB.assembly); }
+
+        // ==========================================
+        // PENDING ASSEMBLY LOGIC (20 Days)
+        // ==========================================
+        function calculatePendingAssembly() { 
+            const now = new Date(); 
+            const cutoff = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000); 
+            
+            const assemblySerials = new Set(); 
+            DB.assembly.forEach(i => { 
+                if (i.serial) { assemblySerials.add(i.serial); } 
+            });
+
+            PENDING_ASSEMBLY_DATA = DB.wiring.filter(i => { 
+                return i.dateObj && i.dateObj >= cutoff && i.serial && !assemblySerials.has(i.serial); 
+            });
+            
+            if($('pending-assembly-count')) { $('pending-assembly-count').innerText = PENDING_ASSEMBLY_DATA.length; }
+        }
+        
+        function showPendingAssembly() {
+            const listHtml = PENDING_ASSEMBLY_DATA.map(i => `<div class="mini-item" onclick="openDetail('${i.id}')"><span><span class="mini-dot" style="background:var(--color-wiring)"></span>${i.customer.substring(0,25)}</span><span style="font-family:monospace; opacity:0.8; font-size:10px;">${i.serial}</span></div>`).join('');
+            $('detail-content').innerHTML = `<div class="detail-row"><span class="detail-label">Wiring Complete, Assembly Pending</span><div style="margin-top:10px; display:flex; flex-direction:column; gap:1px; border-radius:8px; overflow:hidden;">${listHtml || '<div style="text-align:center; color:var(--sub); padding:20px;">No pending items in last 20 days.</div>'}</div></div>`;
+            document.querySelector('.panel-title').innerText = "Pending Assembly"; $('panel-overlay').classList.add('active'); $('side-panel').classList.add('active');
+        }
+
+        // ==========================================
+        // STOCK ROOM LOGIC (LIVE)
+        // ==========================================
+        
+        function calculateLiveStock() {
+            const now = new Date();
+            
+            // 1. Calculate Pending for Assembly (Stuck) - 20 Day Logic
+            const cutoff20Days = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000);
+            const assemblySerialsAll = new Set(DB.assembly.map(i => i.serial));
+            
+            // Map to hold stuck counts
+            const stuckMap = {};
+            
+            DB.wiring.forEach(item => {
+                if (item.dateObj && item.dateObj >= cutoff20Days && item.serial && !assemblySerialsAll.has(item.serial)) {
+                    const mName = SERIAL_MAP[item.serial] || item.customer;
+                    stuckMap[mName] = (stuckMap[mName] || 0) + 1;
+                }
+            });
+
+            // 2. Process Stock List
+            const stockList = [];
+
+            DB.stock.forEach(s => {
+                // A. Read LIVE values from Sheet (Scripts keep these updated)
+                const ready = s.current || 0;       // Col B: Updated by Assembly(+)/Dispatch(-)
+                const prepared = s.prepared || 0;   // Col D: Updated by Worker(+)/Wiring(-)
+                const min = s.min || 0;
+                
+                // B. Get Stuck count from local calculation
+                const stuck = stuckMap[s.name] || 0;
+
+                // C. Calculate Action
+                // Formula: Prepare = Min - (Ready + Prepared + Stuck)
+                const totalAvailable = ready + prepared + stuck;
+                const shortage = min - totalAvailable;
+                const toPrepare = shortage > 0 ? shortage : 0;
+
+                stockList.push({
+                    name: s.name,
+                    min: min,
+                    ready: ready,
+                    prepared: prepared,
+                    stuck: stuck,
+                    toPrepare: toPrepare
+                });
+            });
+
+            renderStockRoom(stockList);
+        }
+
+        function renderStockRoom(items) {
+            const list = $('stock-list');
+            items.sort((a, b) => { return (a.ready - a.min) - (b.ready - b.min); });
+            list.innerHTML = items.map(item => {
+                let actionHtml = '';
+                if (item.toPrepare > 0) { actionHtml = `<span class="status-badge status-restock">Prepare ${item.toPrepare}</span>`; } else { actionHtml = `<span class="status-badge status-ok">OK</span>`; }
+                return `<div class="stock-row"><div class="stock-name">${item.name.replace('SS ', '<span style="color:var(--color-dispatch)">SS</span> ').replace('MS ', '<span style="color:var(--color-assembly)">MS</span> ')}</div><div class="stock-val">${item.min}</div><div class="stock-val" style="color:${item.ready < item.min ? 'var(--color-error)' : 'var(--text)'}">${item.ready}</div><div class="stock-val" style="font-weight:700;">${item.prepared}</div><div class="stock-val" style="color:${item.stuck > 0 ? 'var(--color-warning)' : 'var(--sub)'}">${item.stuck}</div><div class="stock-val">${actionHtml}</div></div>`;
+            }).join('');
+        }
+
+        function updateWorkdayPreview() { let searchDate = new Date(); searchDate.setHours(0,0,0,0); let prevDayData = []; let foundDateStr = ''; for(let i=1; i<10; i++) { let checkDate = new Date(searchDate); checkDate.setDate(searchDate.getDate() - i); let checkStr = checkDate.toLocaleDateString('en-GB'); let totalFound = [...DB.dispatch, ...DB.wiring, ...DB.assembly].filter(x => x.dateStr === checkStr); if(totalFound.length > 0) { prevDayData = totalFound; foundDateStr = checkStr; break; } } document.querySelector('.prev-day-title').innerText = `PREVIOUS WORKDAY: ${foundDateStr || 'None'}`; $('prev-day-list').innerHTML = prevDayData.map(i => `<div class="mini-item" onclick="openDetail('${i.id}')"><span><span class="mini-dot" style="background:var(--color-${i.stage})"></span>${i.customer.substring(0,22)}</span><span style="font-family:monospace; opacity:0.8; font-size:10px;">${i.serial}</span></div>`).join(''); }
+        function togglePrevDay() { const wrap = $('prev-day-list'); const toggle = document.querySelector('.prev-day-toggle'); wrap.classList.toggle('expanded'); toggle.innerText = wrap.classList.contains('expanded') ? '▲ COLLAPSE' : '▼ EXPAND'; }
+        function setStage(stage, el) { currentStage = stage; document.querySelectorAll('.pipe-item').forEach(i => i.classList.remove('active')); if(el) el.classList.add('active'); $('search-box').value = ''; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); $('default-filter').classList.add('active'); applyFilter('today', $('default-filter')); }
+        function getCalendarWeekDates(now) { const startOfThisWeek = new Date(now); startOfThisWeek.setHours(0,0,0,0); startOfThisWeek.setDate(now.getDate() - now.getDay()); const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7); const endOfLastWeek = new Date(startOfLastWeek); endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); endOfLastWeek.setHours(23,59,59,999); return { startOfThisWeek, startOfLastWeek, endOfLastWeek }; }
+        function getFilterCount(arr, mode, now) { const { startOfThisWeek, startOfLastWeek, endOfLastWeek } = getCalendarWeekDates(now); return arr.filter(i => { if(mode === 'all') return true; if(!i.dateObj) return false; const d = new Date(i.dateObj); d.setHours(0,0,0,0); if(mode === 'today') return d.getTime() === now.getTime(); if(mode === 'yesterday') { let y = new Date(now); y.setDate(y.getDate()-1); return d.getTime() === y.getTime(); } if(mode === '2days') { let d2 = new Date(now); d2.setDate(now.getDate()-2); return d.getTime() === d2.getTime(); } if(mode === 'week') return i.dateObj >= startOfThisWeek; if(mode === 'lastweek') return i.dateObj >= startOfLastWeek && i.dateObj <= endOfLastWeek; if(mode === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); if(mode === 'lastmonth') { let lm = new Date(now); lm.setMonth(now.getMonth()-1); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear(); } return true; }).length; }
+        function applyFilter(mode, btn) { if(btn) { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); } const now = new Date(); now.setHours(0,0,0,0); $('today-dispatch-val').innerText = getFilterCount(DB.dispatch, mode, now); $('today-assembly-val').innerText = getFilterCount(DB.assembly, mode, now); $('today-wiring-val').innerText = getFilterCount(DB.wiring, mode, now); const { startOfThisWeek, startOfLastWeek, endOfLastWeek } = getCalendarWeekDates(now); const data = DB[currentStage]; filteredData = data.filter(i => { if(mode === 'all') return true; if(!i.dateObj) return false; const d = new Date(i.dateObj); d.setHours(0,0,0,0); if(mode === 'today') return d.getTime() === now.getTime(); if(mode === 'yesterday') { let y = new Date(now); y.setDate(y.getDate()-1); return d.getTime() === y.getTime(); } if(mode === '2days') { let d2 = new Date(now); d2.setDate(now.getDate()-2); return d.getTime() === d2.getTime(); } if(mode === 'week') return i.dateObj >= startOfThisWeek; if(mode === 'lastweek') return i.dateObj >= startOfLastWeek && i.dateObj <= endOfLastWeek; if(mode === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); if(mode === 'lastmonth') { let lm = new Date(now); lm.setMonth(now.getMonth()-1); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear(); } return true; }).reverse(); renderList(filteredData); updateStats(); }
+        function applyCustomRange() { const s = $('range-start').value; const e = $('range-end').value; if(!s || !e) return alert("Select dates"); const start = new Date(s); start.setHours(0,0,0,0); const end = new Date(e); end.setHours(23,59,59,999); document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); const countRange = (arr) => arr.filter(i => i.dateObj >= start && i.dateObj <= end).length; $('today-dispatch-val').innerText = countRange(DB.dispatch); $('today-assembly-val').innerText = countRange(DB.assembly); $('today-wiring-val').innerText = countRange(DB.wiring); filteredData = DB[currentStage].filter(i => i.dateObj >= start && i.dateObj <= end).reverse(); renderList(filteredData); updateStats(); }
+        function updateStats() { $('ss-count').innerText = filteredData.filter(x => x.type === 'SS').length; $('ms-count').innerText = filteredData.filter(x => x.type === 'MS').length; }
+        function renderList(data) { if(data.length === 0) { $('list-target').innerHTML = '<div style="padding:20px; text-align:center; color:var(--sub);">No Data</div>'; return; } $('list-target').innerHTML = data.map(i => { let tags = ''; if(i.stage === 'dispatch') { const machineName = SERIAL_MAP[i.serial]; if (machineName) tags += `<span class="tag machine-tag" style="background:${getMachineColor(machineName)}">${machineName}</span>`; if (i.hasDateIssue) tags += '<span class="tag error-tag">Date Issue</span>'; else { const cleanName = i.customer.toLowerCase().replace(/\s/g, ''); if (cleanName.includes("rajasekar") || cleanName.includes("rajashekaran")) tags += '<span class="tag export-tag">Export</span>'; else if (customerFrequency[i.customer] >= 2) tags += '<span class="tag dealer-tag">Dealer</span>'; if (i.isPickup) tags += '<span class="tag pickup-tag">Pickup</span>'; } } else { tags += `<span class="tag machine-tag" style="background:${getMachineColor(i.customer)}">${i.customer}</span>`; } return `<div class="item" onclick="openDetail('${i.id}')"><div class="tag-row">${tags}</div><div class="item-top"><div class="cust-name">${i.customer}</div><div class="item-date">${i.dateStr}</div></div><div class="item-meta"><span class="serial-tag">${i.serial}</span>${i.invoice !== 'N/A' ? `<span>#${i.invoice}</span>` : ''}</div></div>`; }).join(''); }
+        function openDetail(id) { document.querySelector('.panel-title').innerText = "Details"; let item = DB.dispatch.find(x => x.id === id) || DB.wiring.find(x => x.id === id) || DB.assembly.find(x => x.id === id); if(!item) return; let machineName = "N/A"; if(item.stage === 'dispatch') machineName = SERIAL_MAP[item.serial] || item.type + " Machine"; let historyHtml = ''; if(item.stage === 'dispatch') { const history = DB.dispatch.filter(d => d.customer === item.customer && d.id !== item.id).sort((a,b) => b.dateObj - a.dateObj).slice(0, 5); if (history.length > 0) historyHtml = `<div class="detail-row"><span class="detail-label">Previous Purchases</span><div class="history-list">${history.map(h => `<div class="history-item"><span>${h.dateStr}</span><span>${h.serial}</span><span>#${h.invoice}</span></div>`).join('')}</div></div>`; }
+            $('detail-content').innerHTML = item.stage === 'dispatch' ? `<div class="detail-row"><span class="detail-label">Date</span><div class="detail-value">${item.dateStr}</div></div><div class="detail-row"><span class="detail-label">Customer</span><div class="detail-value">${item.customer}</div></div><div class="detail-row"><span class="detail-label">Serial</span><div class="detail-value">${item.serial}</div></div><div class="detail-row"><span class="detail-label">Invoice</span><div class="detail-value">${item.invoice}</div></div><div class="detail-row"><span class="detail-label">Machine</span><div class="detail-value">${machineName}</div></div>${historyHtml}` : `<div class="detail-row"><span class="detail-label">Date</span><div class="detail-value">${item.dateStr}</div></div><div class="detail-row"><span class="detail-label">Machine</span><div class="detail-value">${item.customer}</div></div><div class="detail-row"><span class="detail-label">Serial</span><div class="detail-value">${item.serial}</div></div>`; $('panel-overlay').classList.add('active'); $('side-panel').classList.add('active'); }
+        function closePanel() { $('panel-overlay').classList.remove('active'); $('side-panel').classList.remove('active'); }
+        function doSearch() { renderList(filteredData.filter(i => i.raw.includes($('search-box').value.toLowerCase()))); }
+        function switchTab(tab, el) { document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); el.classList.add('active'); $('main-view').style.display = 'none'; $('stock-view').style.display = 'none'; $('analytics-view').style.display = 'none'; if(tab === 'dashboard') { $('main-view').style.display = 'block'; } else if(tab === 'stock') { $('stock-view').style.display = 'block'; calculateLiveStock(); } else { $('analytics-view').style.display = 'block'; renderCharts(); } }
+
+        // ==========================================
+        // CHARTS LOGIC (FULL)
+        // ==========================================
+        function renderCharts() { const wrap = $('charts-wrapper'); if(!wrap) return; wrap.innerHTML = ''; chartInstances.forEach(c => c.destroy()); chartInstances = []; const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); const genColors = (count) => { let arr = []; for(let i=0; i<count; i++) arr.push(colorPalette[i % colorPalette.length]); return arr; }; const wGoal = getWiringGoal(); const aGoal = getAssemblyGoal();
+            createChart('c1', 'Dispatch Trend (30 Days)', 'line', ...generateTimeSeries(DB.dispatch, 30), '#5856d6');
+            createChart('c2', 'Machine Type Mix', 'doughnut', ['SS', 'MS'], [DB.dispatch.filter(d=>d.type==='SS').length, DB.dispatch.filter(d=>d.type==='MS').length], ['#5856d6', '#5ac8fa']);
+            createChart('c3', 'Top 5 Customers', 'bar', ...generateTopList(DB.dispatch.map(i=>i.customer), 5), '#007aff');
+            createChart('c4', 'Current Month Overview', 'bar', ['Wiring', 'Assembly', 'Dispatch'], [DB.wiring.filter(i=>i.dateObj>=mStart&&i.dateObj<=mEnd).length, DB.assembly.filter(i=>i.dateObj>=mStart&&i.dateObj<=mEnd).length, DB.dispatch.filter(i=>i.dateObj>=mStart&&i.dateObj<=mEnd).length], '#ff9500');
+            createChart('c5', 'Top 5 Machines Produced', 'bar', ...generateTopList(DB.assembly.map(i=>i.customer), 5), '#34c759');
+            createChart('c6', 'Delivery Method', 'doughnut', ['Dispatch', 'Pickup'], [DB.dispatch.filter(d=>!d.isPickup).length, DB.dispatch.filter(d=>d.isPickup).length], ['#5856d6', '#34c759']);
+            createChart('c7', 'Best Day of Week', 'bar', ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], generateDayOfWeekCounts(DB.dispatch), '#ff9f40');
+            createChart('c8', 'Monthly Sales Trend', 'line', ...generateMonthlySeries(DB.dispatch), '#ff3b30');
+            createChart('c9', 'Wiring vs Assembly (30d)', 'line', ...generateDualTimeSeries(DB.wiring, DB.assembly, 30), '#ff9500', true);
+            createChart('c10', 'Top 5 Dealers', 'bar', ...generateTopList(Object.keys(customerFrequency), 5, k => customerFrequency[k]), '#ff9500');
+            createChart('c11', 'Production Balance', 'bar', ['Wired', 'Assembled', 'Dispatched'], [DB.wiring.length, DB.assembly.length, DB.dispatch.length], genColors(3));
+            createChart('c12', 'Export vs Local', 'pie', ['Local', 'Export'], [DB.dispatch.filter(d=>!isExport(d.customer)).length, DB.dispatch.filter(d=>isExport(d.customer)).length], ['#5856d6', '#ff2d55']);
+            createChart('c13', 'Yearly Sales', 'bar', ...generateYearlySeries(DB.dispatch), '#007aff');
+            createChart('c14', 'SS vs MS (This Month)', 'doughnut', ['SS', 'MS'], [DB.dispatch.filter(d=>d.type==='SS'&&d.dateObj>=mStart).length, DB.dispatch.filter(d=>d.type==='MS'&&d.dateObj>=mStart).length], ['#5856d6', '#5ac8fa']);
+            createChart('c15', 'Wiring by Day', 'bar', ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], generateDayOfWeekCounts(DB.wiring), '#ff9500');
+            createChart('c16', 'Assembly by Day', 'bar', ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], generateDayOfWeekCounts(DB.assembly), '#5ac8fa');
+            createChart('c17', 'Invoice Types', 'pie', ['4-Digit', 'Standard'], [DB.dispatch.filter(d=>d.isPickup).length, DB.dispatch.filter(d=>!d.isPickup).length], ['#34c759', '#8e8e93']);
+            createChart('c18', 'Top Exporters', 'bar', ...generateTopList(DB.dispatch.filter(d=>isExport(d.customer)).map(i=>i.customer), 3), '#ff2d55');
+            createChart('c19', 'Last 7 Days Wiring', 'line', ...generateTimeSeries(DB.wiring, 7), '#ff9500');
+            createChart('c20', 'Last 7 Days Assembly', 'line', ...generateTimeSeries(DB.assembly, 7), '#5ac8fa');
+            createChart('c21', 'Dispatch Efficiency (%)', 'bar', ['Goal', 'Current'], [100, calculateEfficiency()], '#5856d6');
+            createChart('c22', 'Production Lag', 'bar', ['W-Assembly Gap'], [DB.wiring.length - DB.assembly.length], '#ff9500');
+            createChart('c23', 'New vs Repeat (Month)', 'pie', ['New', 'Repeat'], [getNewCustomersCount(), getRepeatCustomersCount()], ['#5ac8fa', '#ff9500']);
+            createChart('c24', 'Weekly Wiring Goal', 'bar', ['Current', 'Goal (' + wGoal + ')'], [getCurrentWeekCount(DB.wiring), wGoal], '#ff9500');
+            createChart('c25', 'Weekly Assembly Goal', 'bar', ['Current', 'Goal (' + aGoal + ')'], [getCurrentWeekCount(DB.assembly), aGoal], '#5ac8fa');
+            createChart('c26', 'Monthly Growth %', 'line', ...generateGrowthSeries(DB.dispatch), '#34c759');
+            createChart('c27', 'Top 5 SS Machines', 'bar', ...generateTopList(DB.assembly.filter(i=>i.type==='SS').map(i=>i.customer), 5), '#5856d6');
+            createChart('c28', 'Top 5 MS Machines', 'bar', ...generateTopList(DB.assembly.filter(i=>i.type==='MS').map(i=>i.customer), 5), '#5ac8fa');
+            
+            const lastMonthRange = getLastMonthRange(); const lmW = DB.wiring.filter(i => i.dateObj >= lastMonthRange.start && i.dateObj <= lastMonthRange.end).length; const lmA = DB.assembly.filter(i => i.dateObj >= lastMonthRange.start && i.dateObj <= lastMonthRange.end).length; const lmD = DB.dispatch.filter(i => i.dateObj >= lastMonthRange.start && i.dateObj <= lastMonthRange.end).length;
+            createChart('c29', 'Last Month Prod vs Sales', 'bar', ['Wiring', 'Assembly', 'Dispatch'], [lmW, lmA, lmD], genColors(3));
+
+            createChart('c30', 'Data Health', 'pie', ['Valid', 'Issue'], [DB.dispatch.filter(d=>!d.hasDateIssue).length, DB.dispatch.filter(d=>d.hasDateIssue).length], ['#34c759', '#ff3b30']);
+
+            const lastWeekRange = getLastWeekRange(); const lwW = DB.wiring.filter(i => i.dateObj >= lastWeekRange.start && i.dateObj <= lastWeekRange.end).length; const lwA = DB.assembly.filter(i => i.dateObj >= lastWeekRange.start && i.dateObj <= lastWeekRange.end).length; const lwD = DB.dispatch.filter(i => i.dateObj >= lastWeekRange.start && i.dateObj <= lastWeekRange.end).length;
+            createChart('c31', 'Last Week Prod vs Sales', 'bar', ['Wiring', 'Assembly', 'Dispatch'], [lwW, lwA, lwD], genColors(3));
+
+            const cwW = getCurrentWeekCount(DB.wiring); const cwA = getCurrentWeekCount(DB.assembly); const cwD = getCurrentWeekCount(DB.dispatch);
+            createChart('c32', 'Current Week Progress', 'bar', ['Wiring', 'Assembly', 'Dispatch'], [cwW, cwA, cwD], genColors(3));
+        }
+
+        function getLastMonthRange() { const now = new Date(); const start = new Date(now.getFullYear(), now.getMonth() - 1, 1); const end = new Date(now.getFullYear(), now.getMonth(), 0); return { start, end }; }
+        function getLastWeekRange() { const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - now.getDay() - 7); start.setHours(0,0,0,0); const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999); return { start, end }; }
+
+        function generateTimeSeries(arr, days) { const data = {}; const labels = []; for(let i=days; i>=0; i--) { const d = new Date(); d.setDate(d.getDate()-i); labels.push(d.toLocaleDateString('en-GB')); } arr.filter(i => !i.hasDateIssue).forEach(i => { if(i.dateStr) data[i.dateStr] = (data[i.dateStr] || 0) + 1; }); return [labels, labels.map(l => data[l] || 0)]; }
+        function generateDualTimeSeries(arr1, arr2, days) { const d1 = {}; const d2 = {}; const labels = []; for(let i=days; i>=0; i--) { const d = new Date(); d.setDate(d.getDate()-i); labels.push(d.toLocaleDateString('en-GB')); } arr1.filter(i => !i.hasDateIssue).forEach(i => { if(i.dateStr) d1[i.dateStr] = (d1[i.dateStr] || 0) + 1; }); arr2.filter(i => !i.hasDateIssue).forEach(i => { if(i.dateStr) d2[i.dateStr] = (d2[i.dateStr] || 0) + 1; }); return [labels, labels.map(l => d1[l] || 0), '#ff9500', labels.map(l => d2[l] || 0), '#5ac8fa']; }
+        function generateTopList(arr, count, mapFn) { const counts = {}; arr.forEach(i => counts[i] = (counts[i] || 0) + 1); let entries = Object.entries(counts); if(mapFn) entries = entries.map(([k,v]) => [k, mapFn(k)]); entries.sort((a,b) => b[1] - a[1]); return [entries.slice(0, count).map(e => e[0].substring(0,10)), entries.slice(0, count).map(e => e[1])]; }
+        function generateMonthlySeries(arr) { const data = {}; arr.filter(d=>!d.hasDateIssue).forEach(i => { if(i.dateObj) { const k = `${i.dateObj.getFullYear()}-${i.dateObj.getMonth()+1}`; data[k] = (data[k] || 0) + 1; }}); const labels = Object.keys(data).sort().slice(-6); return [labels, labels.map(l => data[l])]; }
+        function generateYearlySeries(arr) { const data = {}; arr.filter(d=>!d.hasDateIssue).forEach(i => { if(i.dateObj) data[i.dateObj.getFullYear()] = (data[i.dateObj.getFullYear()] || 0) + 1; }); const labels = Object.keys(data).sort(); return [labels, labels.map(l => data[l])]; }
+        function generateDayOfWeekCounts(arr) { const counts = new Array(7).fill(0); arr.filter(d=>!d.hasDateIssue).forEach(i => { if(i.dateObj) counts[i.dateObj.getDay()]++; }); return counts; }
+        function generateGrowthSeries(arr) { const monthly = {}; arr.filter(d=>!d.hasDateIssue).forEach(i => { if(i.dateObj) monthly[`${i.dateObj.getFullYear()}-${i.dateObj.getMonth()+1}`] = (monthly[`${i.dateObj.getFullYear()}-${i.dateObj.getMonth()+1}`] || 0) + 1; }); const labels = Object.keys(monthly).sort().slice(-6); const data = labels.map((l, idx) => { if(idx===0) return 0; const prev = monthly[labels[idx-1]]; return prev ? Math.round(((monthly[l] - prev) / prev) * 100) : 0; }); return [labels, data]; }
+        
+        function isExport(name) { const n = name.toLowerCase().replace(/\s/g, ""); return n.includes("rajasekar") || n.includes("rajashekaran"); }
+        function calculateEfficiency() { const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); const current = DB.dispatch.filter(i => i.dateObj >= mStart && i.dateObj <= mEnd).length; const goalKey = `goal_${now.getFullYear()}_${now.getMonth()}`; const goal = parseInt(localStorage.getItem(goalKey) || "100"); return Math.min(100, Math.round((current / goal) * 100)); }
+        function getNewCustomersCount() { const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const thisMonthCustomers = new Set(DB.dispatch.filter(i=>i.dateObj>=mStart).map(i=>i.customer)); let newC = 0; thisMonthCustomers.forEach(c => { const firstPurchase = DB.dispatch.find(i => i.customer === c); if(firstPurchase && firstPurchase.dateObj >= mStart) newC++; }); return newC; }
+        function getRepeatCustomersCount() { const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const thisMonthCustomers = new Set(DB.dispatch.filter(i=>i.dateObj>=mStart).map(i=>i.customer)); return thisMonthCustomers.size - getNewCustomersCount(); }
+
+        function createChart(id, title, type, labels, data, color, isMixed = false, data2 = null, color2 = null) {
+            const wrap = $('charts-wrapper'); if(!wrap) return; const card = document.createElement('div'); card.className = 'chart-card'; card.innerHTML = `<div class="chart-title">${title}</div><div class="chart-wrapper"><canvas id="${id}"></canvas></div>`; wrap.appendChild(card);
+            const ctx = document.getElementById(id).getContext('2d'); const datasets = [{ label: title, data: data, backgroundColor: type === 'line' ? (color + '33') : (type === 'bar' ? color : genColors(labels.length)), borderColor: color, borderWidth: type === 'line' ? 2 : 1, fill: type === 'line', tension: 0.4 }];
+            if (isMixed && data2) datasets.push({ label: 'Assembly', data: data2, backgroundColor: color2 + '33', borderColor: color2, borderWidth: 2, fill: true, tension: 0.4 });
+            const chart = new Chart(ctx, { type: type, data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type === 'doughnut' || type === 'pie' || isMixed } }, scales: (type === 'doughnut' || type === 'pie') ? {} : { y: { beginAtZero: true } } } });
+            chartInstances.push(chart);
+        }
+        function genColors(count) { const colors = []; for(let i=0; i<count; i++) colors.push(colorPalette[i % colorPalette.length]); return colors; }
+
+        // Init
+        loadBackground(); loadSyncTime(); fetchData();
+    </script>
+</body>
+</html>

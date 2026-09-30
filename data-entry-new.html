@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Worker Action List</title>
+    <style>
+        :root {
+            --bg: #f2f2f7; --surface: #ffffff; --text: #1c1c1e; --sub: #8e8e93; --border: #e5e5ea;
+            --danger: #ff3b30; --success: #34c759; --accent: #007aff; --safe-bottom: env(safe-area-inset-bottom, 20px);
+        }
+        
+        [data-theme="dark"] {
+            --bg: #000000; 
+            --surface: #1c1c1e; 
+            --text: #ffffff; 
+            --sub: #a0a0a5;
+            --border: #38383a;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: var(--bg); margin: 0; padding: 15px; 
+            padding-bottom: calc(80px + var(--safe-bottom)); color: var(--text); 
+            min-height: 100vh; transition: background 0.3s, color 0.3s;
+        }
+
+        #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-size: cover; background-position: center; opacity: 0; transition: opacity 0.3s; }
+        body.has-bg #bg-layer { opacity: 1; }
+        body.has-bg { --surface: rgba(30, 30, 30, 0.85); -webkit-backdrop-filter: blur(15px); backdrop-filter: blur(15px); }
+        body.has-bg .action-card, body.has-bg .modal-content { background: rgba(30, 30, 30, 0.85); backdrop-filter: blur(10px); }
+        body.has-bg .machine-info p, body.has-bg .history-time { color: #ddd; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; padding: 10px 0; background: var(--bg); }
+        .header h1 { font-size: 24px; font-weight: 800; margin: 0; }
+        .header-btns { display: flex; gap: 8px; align-items: center; }
+        
+        .btn { border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-sync { background: var(--accent); color: white; padding: 8px 16px; font-size: 14px; }
+        .btn-sec { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; font-size: 14px; }
+        .btn-plus { background: var(--success); color: white; padding: 12px; flex: 1.5; font-size: 18px; }
+        .btn-bulk { background: var(--text); color: var(--bg); padding: 10px 15px; font-size: 13px; border-radius: 8px; margin-left: 5px; }
+        
+        /* NEW: Add Machine button */
+        .btn-add-machine { background: var(--accent); color: white; padding: 8px 12px; font-size: 14px; }
+        
+        [data-theme="dark"] .btn-bulk { background: #ffffff; color: #000000; }
+        .btn:active { transform: scale(0.96); opacity: 0.8; }
+
+        /* Section Headers */
+        .section-block { margin-bottom: 25px; }
+        .section-title { 
+            font-size: 18px; font-weight: 800; margin-bottom: 12px; 
+            display: flex; align-items: center; gap: 8px; 
+            padding-left: 5px;
+        }
+        .section-title.ss { color: var(--accent); } /* Blue for SS */
+        .section-title.ms { color: var(--success); } /* Green for MS */
+        .section-count {
+            font-size: 11px; background: var(--text); color: var(--bg); 
+            padding: 2px 8px; border-radius: 10px; font-weight: 700;
+        }
+
+        .action-card { background: var(--surface); border-radius: 16px; padding: 20px; margin-bottom: 15px; border-left: 6px solid var(--danger); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: background 0.3s; }
+        .action-card.ok { border-left-color: var(--success); opacity: 0.8; }
+        .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        
+        .machine-info h2 { margin: 0 0 5px 0; font-size: 20px; letter-spacing: -0.5px; }
+        .machine-info p { margin: 0; color: var(--sub); font-size: 13px; font-weight: 500; transition: color 0.3s; }
+        
+        .action-badge { width: 60px; height: 60px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; background: var(--danger); color: white; flex-shrink: 0; transition: background 0.3s, color 0.3s; }
+        
+        .action-badge.ok { background: #e8f5e9; color: var(--success); }
+        [data-theme="dark"] .action-badge.ok { background: rgba(52, 199, 89, 0.2); color: #34c759; }
+
+        .num { font-size: 24px; line-height: 1; }
+        .lbl { font-size: 9px; margin-top: 2px; }
+
+        .controls-row { display: flex; gap: 10px; align-items: stretch; }
+        .bulk-input-group { display: flex; align-items: center; background: var(--bg); border-radius: 10px; padding: 4px 8px; border: 1px solid var(--border); flex: 1; transition: background 0.3s, border 0.3s; }
+        .bulk-input-group input { background: transparent; border: none; width: 100%; padding: 8px 0; font-size: 16px; font-weight: 700; text-align: center; outline: none; color: var(--text); caret-color: var(--accent); }
+        .bulk-input-group input::placeholder { color: var(--sub); opacity: 1; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background: var(--surface); width: 90%; max-width: 400px; border-radius: 20px; padding: 25px; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border); }
+        .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .close-btn { cursor: pointer; opacity: 0.6; font-size: 24px; line-height: 1; color: var(--text); }
+
+        .theme-switcher { display: flex; background: var(--bg); border-radius: 12px; padding: 4px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .theme-btn { flex: 1; padding: 12px; border: none; background: transparent; color: var(--sub); font-weight: 700; font-size: 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .theme-btn.active { background: var(--accent); color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+
+        .bg-btn { width: 100%; padding: 12px; margin-top: 10px; background: var(--bg); border: 1px dashed var(--border); color: var(--text); font-size: 13px; font-weight: 700; }
+        .bg-btn.danger { border-color: var(--danger); color: var(--danger); }
+
+        .history-item { background: var(--bg); padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; font-size: 13px; border: 1px solid var(--border); }
+        .history-val { font-weight: 700; }
+        .history-time { color: var(--sub); font-size: 11px; }
+
+        /* NEW: Add Machine form styles */
+        .add-machine-field { margin-bottom: 12px; }
+        .add-machine-field label { font-size:12px; font-weight:700; color:var(--sub); display:block; margin-bottom:4px; }
+        .add-machine-field input, .add-machine-field select { 
+            width: 100%; padding: 12px; border-radius: 10px; 
+            border: 1px solid var(--border); font-size: 16px; 
+            box-sizing: border-box; background: var(--bg); color: var(--text);
+        }
+        .add-machine-field input::placeholder { color: var(--sub); opacity: 1; }
+        .add-machine-hint { font-size: 11px; color: var(--sub); margin-top: 4px; }
+        .btn-add-submit { 
+            background: var(--success); color: white; border: none; 
+            padding: 16px; border-radius: 12px; font-size: 16px; 
+            font-weight: 700; cursor: pointer; margin-top: 8px; width: 100%;
+        }
+        .add-machine-status { font-size:13px; text-align:center; min-height:20px; margin-top: 10px; }
+
+        #toast-container {
+            position: fixed; bottom: calc(80px + var(--safe-bottom)); left: 15px; right: 15px; 
+            z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .toast {
+            background: #323232; color: white; padding: 14px 20px; border-radius: 12px; 
+            font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+
+        #loader { text-align: center; padding: 50px; color: var(--sub); font-weight: 600; }
+        .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* === TAB BAR (new — switches between Actions and Stock views) === */
+        .tab-bar { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin-bottom: 15px; border: 1px solid var(--border); }
+        .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; color: var(--sub); font-weight: 700; font-size: 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background: var(--accent); color: white; }
+
+        /* === STOCK CARDS (new) === */
+        .stock-card { background: var(--surface); border-radius: 16px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: background 0.3s; }
+        .stock-card.stock-low { border-left: 6px solid var(--danger); }
+        .stock-card.stock-ok { border-left: 6px solid var(--success); }
+        .stock-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .stock-name { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        .stock-badge { font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 10px; text-transform: uppercase; }
+        .stock-badge.ok { background: var(--success); color: white; }
+        .stock-badge.low { background: var(--danger); color: white; }
+        .stock-values { display: flex; gap: 8px; }
+        .stock-val { flex: 1; background: var(--bg); border-radius: 12px; padding: 12px 8px; text-align: center; transition: background 0.3s; }
+        .stock-val-num { font-size: 22px; font-weight: 800; line-height: 1; }
+        .stock-val-lbl { font-size: 9px; color: var(--sub); text-transform: uppercase; margin-top: 4px; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+    <div id="bg-layer"></div>
+
+    <div class="header">
+        <div>
+            <h1>Action List</h1>
+            <div id="sync-time-display" style="font-size: 11px; color: var(--sub); font-weight: 600;">Syncing...</div>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-sec" onclick="openModal('history')">🕓</button>
+            <button class="btn btn-sec" onclick="openModal('settings')">⚙️</button>
+            <!-- NEW: Add Machine button -->
+            <button class="btn btn-add-machine" onclick="openModal('add-machine')">+ Machine</button>
+            <button class="btn btn-sync" onclick="runSync()">Sync</button>
+        </div>
+    </div>
+
+    <div id="loader"><div class="spinner"></div>Calculating...</div>
+    
+    <!-- === TAB BAR (new — switch between Actions and Stock) === -->
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tab-action" onclick="switchTab('action')">Actions</button>
+        <button class="tab-btn" id="tab-stock" onclick="switchTab('stock')">Stock</button>
+    </div>
+    
+    <!-- Container for the two grids (Actions tab) -->
+    <div id="list-container"></div>
+    
+    <!-- Container for the Stock view (hidden by default) -->
+    <div id="stock-container" style="display:none;"></div>
+
+    <div id="toast-container"></div>
+
+    <!-- History Modal -->
+    <div id="modal-history" class="modal-overlay" onclick="closeModal('history')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title">Recent Updates <span class="close-btn" onclick="closeModal('history')">×</span></div>
+            <div id="history-list" style="color: var(--sub); text-align:center; padding: 20px;">No updates yet.</div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal-overlay" onclick="closeModal('settings')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title">Settings <span class="close-btn" onclick="closeModal('settings')">×</span></div>
+            
+            <label style="font-size:12px; font-weight:700; color:var(--sub);">Appearance</label>
+            <div class="theme-switcher">
+                <button class="theme-btn active" id="theme-light-btn" onclick="setTheme('')">Light</button>
+                <button class="theme-btn" id="theme-dark-btn" onclick="setTheme('dark')">Dark</button>
+            </div>
+
+            <label style="font-size:12px; font-weight:700; color:var(--sub); margin-top:15px; display:block;">Custom Background</label>
+            <button class="btn bg-btn" onclick="document.getElementById('bg-file').click()">Upload Image</button>
+            <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="setBackground(this)">
+            <button class="btn bg-btn danger" style="margin-top:5px;" onclick="clearBackground()">Remove Background</button>
+        </div>
+    </div>
+
+    <!-- NEW: Add Machine Modal -->
+    <div id="modal-add-machine" class="modal-overlay" onclick="closeModal('add-machine')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title">
+                Add New Machine
+                <span class="close-btn" onclick="closeModal('add-machine')">×</span>
+            </div>
+            
+            <div class="add-machine-field">
+                <label>Model Name *</label>
+                <input type="text" id="new-model-name" placeholder="e.g. CIDM200 or KX100">
+                <div class="add-machine-hint">Existing models: CIDM, CSEM, CSIM, CCBM, CIDM110</div>
+            </div>
+            
+            <div class="add-machine-field">
+                <label>Material Type *</label>
+                <select id="new-material-type">
+                    <option value="SS">SS (Stainless Steel)</option>
+                    <option value="MS">MS (Mild Steel)</option>
+                </select>
+                <div class="add-machine-hint">Determines which prefix matching rule to use.</div>
+            </div>
+            
+            <div class="add-machine-field">
+                <label>Serial Prefix *</label>
+                <input type="text" id="new-serial-prefix" placeholder="e.g. SSKM or KM">
+                <div class="add-machine-hint">Serials starting with this prefix will be attributed to this material type.</div>
+            </div>
+            
+            <div class="add-machine-field">
+                <label>Serial Pattern (regex, optional)</label>
+                <input type="text" id="new-serial-pattern" placeholder="e.g. ^SSKM\d+$  (or leave as .* for any)">
+                <div class="add-machine-hint">Used to detect overlap with existing machines. Use .* if pattern unknown.</div>
+            </div>
+            
+            <div class="add-machine-field">
+                <label>Minimum Stock Level</label>
+                <input type="number" id="new-min-stock" value="5" min="0">
+            </div>
+            
+            <button class="btn-add-submit" onclick="submitNewMachine()">Add Machine</button>
+            <div id="add-machine-status" class="add-machine-status"></div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            stock: `https://docs.google.com/spreadsheets/d/1nsLwfGbA_rVtdZxn9fSzW9_2o9JAT0OGVWwrO-vv2sQ/export?format=csv&gid=0`,
+            wiring: `https://docs.google.com/spreadsheets/d/19y16Nu7GdYPN0DdTZId2bfoBn4jSmV5ZVHXSkdDdcRY/export?format=csv`,
+            assembly: `https://docs.google.com/spreadsheets/d/1vYAuJxLY3DXoTf_5Pbvin1zwA6L8N4pNOhy180ag4p0/export?format=csv`,
+            
+            // === NEW CONSOLIDATED URL ===
+            // Single URL for all actions — different ?action= per operation
+            coreUrl: `https://script.google.com/macros/s/AKfycbxhC68ObyS_Z3swzMh0NjWgd9Qs2W3pOGu2HKjQRA5LIfXH_LHx_mEDyYFnCo-OxwNe/exec`,
+            get updateUrl() { return this.coreUrl + '?action=manualStockEntry'; },
+            get machinesUrl() { return this.coreUrl + '?action=readMachines'; },
+            get addMachineUrl() { return this.coreUrl + '?action=addMachine'; }
+        };
+
+        const DB = { wiring: [], assembly: [], stock: [] };
+        const SERIAL_MAP = {}; 
+        const $ = (id) => document.getElementById(id);
+
+        // === HARDCODED FALLBACK ===
+        // Used only if fetchMachines() fails. Original 10 machines.
+        const FALLBACK_MACHINE_NAMES = [
+            'SS CIDM', 'SS CSEM', 'SS CSIM', 'SS CCBM', 'SS CIDM110',
+            'MS CIDM', 'MS CSEM', 'MS CSIM', 'MS CCBM', 'MS CIDM110'
+        ];
+        let ACTIVE_MACHINE_NAMES = [...FALLBACK_MACHINE_NAMES];
+
+        const openModal = (id) => $(`modal-${id}`).style.display = 'flex';
+        const closeModal = (id) => $(`modal-${id}`).style.display = 'none';
+        const showLoader = (show) => $('loader').style.display = show ? 'block' : 'none';
+
+        function showToast(message, type = 'success') {
+            const container = $('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span style='font-size:18px'>${type === 'success' ? '✓' : '⚠️'}</span> ${message}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // === FETCH MACHINE LIST FROM REGISTRY ===
+        async function fetchMachines() {
+            try {
+                const res = await fetch(CONFIG.machinesUrl);
+                const data = await res.json();
+                if (data.machines && data.machines.length > 0) {
+                    // Build display names: "SS CIDM", "MS CSEM", etc.
+                    ACTIVE_MACHINE_NAMES = data.machines.map(m => `${m.material_type} ${m.model_name}`);
+                    console.log(`Loaded ${ACTIVE_MACHINE_NAMES.length} machines from registry:`, ACTIVE_MACHINE_NAMES);
+                }
+            } catch (err) {
+                console.warn('Dynamic fetch failed, using fallback list:', err);
+            }
+        }
+
+        function loadSettings() {
+            const theme = localStorage.getItem('worker_theme') || '';
+            if (theme) document.body.setAttribute('data-theme', theme); else document.body.removeAttribute('data-theme');
+            $('theme-light-btn').classList.toggle('active', theme === '');
+            $('theme-dark-btn').classList.toggle('active', theme === 'dark');
+            
+            const bg = localStorage.getItem('worker_bg');
+            if (bg) { $('bg-layer').style.backgroundImage = `url(${bg})`; document.body.classList.add('has-bg'); }
+            else { $('bg-layer').style.backgroundImage = 'none'; document.body.classList.remove('has-bg'); }
+        }
+        function setTheme(t) { localStorage.setItem('worker_theme', t); loadSettings(); }
+        
+        function setBackground(input) {
+            if(!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas'); const maxW=800;
+                    canvas.width = maxW; canvas.height = maxW * (img.height/img.width);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    localStorage.setItem('worker_bg', canvas.toDataURL('jpeg', 0.6)); loadSettings();
+                }; img.src = e.target.result;
+            }; reader.readAsDataURL(input.files[0]);
+        }
+        function clearBackground() { localStorage.removeItem('worker_bg'); loadSettings(); }
+
+        function getHistory() { try { return JSON.parse(localStorage.getItem('worker_history') || "[]"); } catch { return []; } }
+        function addHistory(machine, amount) {
+            let history = getHistory();
+            history.unshift({ machine, amount, time: new Date().toLocaleString([], {hour:'2-digit', minute:'2-digit', day:'numeric', month:'short'}) });
+            if(history.length > 10) history.pop();
+            localStorage.setItem('worker_history', JSON.stringify(history));
+            renderHistory();
+        }
+        function renderHistory() {
+            const list = $('history-list'); const history = getHistory();
+            if(history.length === 0) { list.innerHTML = "No updates yet."; return; }
+            list.innerHTML = history.map(h => `
+                <div class="history-item">
+                    <div><div style="font-weight:700">${h.machine}</div><div class="history-time">${h.time}</div></div>
+                    <div class="history-val" style="color:${h.amount>0?'var(--success)':'var(--danger)'}">${h.amount > 0 ? '+' : ''}${h.amount}</div>
+                </div>
+            `).join('');
+        }
+
+        async function runSync() {
+            showLoader(true);
+            try {
+                // === FETCH MACHINES FIRST ===
+                await fetchMachines();
+                
+                const [wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.wiring), fetch(CONFIG.assembly), fetch(CONFIG.stock) ]);
+                DB.wiring = parseProductionSheet(await wRes.text());
+                DB.assembly = parseProductionSheet(await aRes.text());
+                DB.stock = parseBaseStockCSV(await sRes.text());
+
+                renderList(calculateActions());
+                renderStockList();  // NEW — also render Stock tab
+                $('sync-time-display').innerText = "Sync: " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                console.error(e);
+                $('list-container').innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">Connection Error.</div>';
+            } finally { showLoader(false); }
+        }
+
+        async function updateStock(machineName, amount) {
+            const amountVal = parseInt(amount);
+            if (isNaN(amountVal) || amountVal === 0) return showToast("Enter valid number", 'error');
+            
+            const item = DB.stock.find(i => i.name === machineName);
+            if(item) {
+                item.prepared += amountVal;
+                renderList(calculateActions());
+            }
+
+            try {
+                const response = await fetch(CONFIG.updateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ machineName, amount: amountVal })
+                });
+
+                const text = await response.text();
+                let result;
+                try { result = JSON.parse(text); } 
+                catch { throw new Error("Server returned invalid response: " + text); }
+
+                if (result.status === "success") {
+                    addHistory(machineName, amountVal);
+                    showToast(`Updated ${machineName} by ${amountVal}`, 'success');
+                } else {
+                    if(item) item.prepared -= amountVal;
+                    renderList(calculateActions());
+                    showToast(result.message || "Update failed", 'error');
+                }
+
+            } catch (e) {
+                if(item) item.prepared -= amountVal;
+                renderList(calculateActions());
+                console.error(e);
+                showToast("Connection failed", 'error');
+            }
+        }
+
+        // === NEW: SUBMIT NEW MACHINE TO REGISTRY ===
+        async function submitNewMachine() {
+            const modelName = $('new-model-name').value.trim();
+            const materialType = $('new-material-type').value;
+            const serialPrefix = $('new-serial-prefix').value.trim().toUpperCase();
+            const serialPattern = $('new-serial-pattern').value.trim() || '.*';
+            const minStock = parseInt($('new-min-stock').value) || 5;
+            
+            const statusEl = $('add-machine-status');
+            
+            // Validate
+            if (!modelName || !materialType || !serialPrefix) {
+                statusEl.innerHTML = '<span style="color:var(--danger)">Please fill all required fields</span>';
+                return;
+            }
+            
+            statusEl.innerHTML = '<span style="color:var(--sub)">Adding machine...</span>';
+            
+            try {
+                const response = await fetch(CONFIG.addMachineUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        model_name: modelName,
+                        material_type: materialType,
+                        serial_prefix: serialPrefix,
+                        serial_pattern: serialPattern,
+                        min_stock: minStock
+                    })
+                });
+                
+                const text = await response.text();
+                let result;
+                try { result = JSON.parse(text); } 
+                catch { throw new Error("Server returned invalid response: " + text); }
+                
+                if (result.status === 'success') {
+                    statusEl.innerHTML = `<span style="color:var(--success)">✓ ${result.machine_name} added successfully!</span>`;
+                    
+                    // Clear the form
+                    $('new-model-name').value = '';
+                    $('new-serial-prefix').value = '';
+                    $('new-serial-pattern').value = '';
+                    $('new-min-stock').value = '5';
+                    
+                    // Refresh the machine list and close modal after 2 seconds
+                    setTimeout(() => {
+                        closeModal('add-machine');
+                        runSync();
+                    }, 2000);
+                    
+                    showToast(`Machine ${result.machine_name} added`, 'success');
+                } else {
+                    statusEl.innerHTML = `<span style="color:var(--danger)">⚠ ${result.message || 'Failed to add machine'}</span>`;
+                }
+            } catch (e) {
+                statusEl.innerHTML = `<span style="color:var(--danger)">⚠ Connection failed: ${e.message}</span>`;
+            }
+        }
+
+        function calculateActions() {
+            const now = new Date();
+            const cutoff20Days = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000);
+            const assemblySerials = new Set(DB.assembly.map(i => i.serial));
+            
+            const stuckMap = {};
+            DB.wiring.forEach(item => {
+                if (item.dateObj && item.dateObj >= cutoff20Days && item.serial && !assemblySerials.has(item.serial)) {
+                    const mName = SERIAL_MAP[item.serial] || item.customer;
+                    stuckMap[mName] = (stuckMap[mName] || 0) + 1;
+                }
+            });
+
+            const actionList = [];
+            DB.stock.forEach(s => {
+                const ready = s.current || 0;
+                const prepared = s.prepared || 0;
+                const min = s.min || 0;
+                const stuck = stuckMap[s.name] || 0;
+                const totalAvailable = ready + prepared + stuck;
+                const shortage = min - totalAvailable;
+                const toPrepare = shortage > 0 ? shortage : 0;
+
+                actionList.push({ 
+                    name: s.name, 
+                    toPrepare: toPrepare, 
+                    min: min, 
+                    current: totalAvailable
+                });
+            });
+
+            return actionList.sort((a, b) => b.toPrepare - a.toPrepare);
+        }
+
+        function renderList(actions) {
+            // Separate into SS and MS arrays
+            const ssItems = actions.filter(i => i.name.startsWith("SS"));
+            const msItems = actions.filter(i => i.name.startsWith("MS"));
+            // Any other prefix (future-proofing for new material types like FX, etc.)
+            const otherItems = actions.filter(i => !i.name.startsWith("SS") && !i.name.startsWith("MS"));
+
+            const renderCards = (items, prefix) => {
+                if(items.length === 0) return '<div style="text-align:center; padding:20px; color:var(--sub);">No machines found.</div>';
+                return items.map((item, idx) => {
+                    const isOk = item.toPrepare === 0;
+                    const id = `${prefix}-${idx}`; // Unique ID for input
+                    return `
+                    <div class="action-card ${isOk ? 'ok' : ''}">
+                        <div class="card-top">
+                            <div class="machine-info">
+                                <h2>${item.name}</h2>
+                                <p>Target: ${item.min} | Available: ${item.current}</p>
+                            </div>
+                            <div class="action-badge ${isOk ? 'ok' : ''}">
+                                <div class="num">${isOk ? '✓' : item.toPrepare}</div>
+                                <div class="lbl">${isOk ? 'OK' : 'PREP'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="controls-row">
+                            <button class="btn btn-plus" onclick="updateStock('${item.name}', 1)">+1</button>
+                            
+                            <div class="bulk-input-group">
+                                <input type="number" id="qty-${id}" placeholder="Qty" inputmode="numeric">
+                                <button class="btn btn-bulk" onclick="updateStock('${item.name}', $('qty-${id}').value)">Add</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            };
+
+            // Calculate counts for badges
+            const ssCount = ssItems.filter(i => i.toPrepare > 0).length;
+            const msCount = msItems.filter(i => i.toPrepare > 0).length;
+            const otherCount = otherItems.filter(i => i.toPrepare > 0).length;
+
+            $('list-container').innerHTML = `
+                <!-- SS Section -->
+                <div class="section-block">
+                    <div class="section-title ss">
+                        SS Machines 
+                        ${ssCount > 0 ? `<span class="section-count">${ssCount} Action</span>` : ''}
+                    </div>
+                    ${renderCards(ssItems, 'ss')}
+                </div>
+
+                <!-- MS Section -->
+                <div class="section-block">
+                    <div class="section-title ms">
+                        MS Machines 
+                        ${msCount > 0 ? `<span class="section-count">${msCount} Action</span>` : ''}
+                    </div>
+                    ${renderCards(msItems, 'ms')}
+                </div>
+
+                ${otherItems.length > 0 ? `
+                <!-- Other Section (for future material types) -->
+                <div class="section-block">
+                    <div class="section-title" style="color: var(--orange);">
+                        Other Machines 
+                        ${otherCount > 0 ? `<span class="section-count">${otherCount} Action</span>` : ''}
+                    </div>
+                    ${renderCards(otherItems, 'other')}
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // --- PARSERS (preserved verbatim from original) ---
+        function parseDate(s) { 
+            if (!s) return new Date(2000,0,1); 
+            const p = s.toString().split(/[\/\-]/); 
+            if (p.length < 3) return new Date(2000,0,1); 
+            let date; 
+            if (p[0].length === 4) date = new Date(p[0], p[1]-1, p[2]); 
+            else date = new Date(p[2], p[1]-1, p[0]); 
+            const now = new Date(); 
+            if (date.getFullYear() < 2010 || date.getFullYear() > now.getFullYear() + 1) return new Date(2000,0,1); 
+            return date; 
+        }
+        function parseBaseStockCSV(text) { 
+            const rows = text.split('\n').slice(1); const data = []; 
+            rows.forEach(row => { 
+                if(!row.trim()) return; 
+                const cells = row.split(',').map(c => c.trim()); 
+                if(cells.length >= 4) { data.push({ name: cells[0], current: parseInt(cells[1]) || 0, min: parseInt(cells[2]) || 0, prepared: parseInt(cells[3]) || 0 }); } 
+            }); return data; 
+        }
+        function parseProductionSheet(text) {
+            const rows = text.split('\n'); if (rows.length < 2) return []; const results = [];
+            const rawHeaders = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
+            const headers = rawHeaders.map(h => h.toLowerCase());
+            const ignoreExact = ['id', 's.no', 'sno', 'no', '#'];
+            const ignoreSubstrings = ['date', 'time', 'shift', 'operator', 'status', 'remark', 'note', 'total', 'count', 'day', 'name', 'model'];
+            const ignoreIndices = new Set(); let dateColIndex = -1;
+            headers.forEach((h, idx) => { if (!h) return; if (ignoreExact.includes(h) || ignoreSubstrings.some(k => h.includes(k))) { if (h.includes('date')) dateColIndex = idx; ignoreIndices.add(idx); } });
+            if (dateColIndex === -1 && rows[1]) { const firstRowCells = rows[1].split(','); for(let i=0; i<firstRowCells.length; i++) { if(parseDate(firstRowCells[i].replace(/"/g, ''))) { dateColIndex = i; ignoreIndices.add(i); break; } } }
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i]; if (!row.trim()) continue;
+                const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+                const dateVal = (dateColIndex !== -1 && cells[dateColIndex]) ? cells[dateColIndex] : null; const dateObj = parseDate(dateVal);
+                cells.forEach((val, idx) => {
+                    if (ignoreIndices.has(idx)) return; const serial = val.trim().toUpperCase(); if (!serial) return;
+                    let machineType = null; if (serial.startsWith("SSKM")) machineType = 'SS'; else if (serial.startsWith("KM")) machineType = 'MS';
+                    if (machineType) {
+                        const machineName = rawHeaders[idx] || 'Unknown'; const displayName = `${machineType} ${machineName}`;
+                        SERIAL_MAP[serial] = displayName;
+                        results.push({ serial: serial, customer: displayName, dateObj: dateObj });
+                    }
+                });
+            }
+            return results;
+        }
+
+        // === TAB SWITCHING (new — switches between Actions and Stock views) ===
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('tab-' + tab);
+            if (btn) btn.classList.add('active');
+            
+            if (tab === 'action') {
+                document.getElementById('list-container').style.display = 'block';
+                document.getElementById('stock-container').style.display = 'none';
+            } else {
+                document.getElementById('list-container').style.display = 'none';
+                document.getElementById('stock-container').style.display = 'block';
+                renderStockList();
+            }
+        }
+
+        // === RENDER STOCK LIST (new — shows all machines with their stock values) ===
+        function renderStockList() {
+            const target = document.getElementById('stock-container');
+            if (!target) return;
+            
+            if (!DB.stock || DB.stock.length === 0) {
+                target.innerHTML = '<div style="text-align:center; padding:40px; color:var(--sub);">No stock data. Tap Sync.</div>';
+                return;
+            }
+            
+            const ssItems = DB.stock.filter(s => s.name.startsWith("SS"));
+            const msItems = DB.stock.filter(s => s.name.startsWith("MS"));
+            const otherItems = DB.stock.filter(s => !s.name.startsWith("SS") && !s.name.startsWith("MS"));
+            
+            const renderStockCards = (items) => {
+                if (items.length === 0) return '<div style="text-align:center; padding:20px; color:var(--sub);">No machines in this category.</div>';
+                return items.map(s => {
+                    const isLow = s.current < s.min;
+                    return `
+                    <div class="stock-card ${isLow ? 'stock-low' : 'stock-ok'}">
+                        <div class="stock-card-head">
+                            <div class="stock-name">${s.name}</div>
+                            <div class="stock-badge ${isLow ? 'low' : 'ok'}">${isLow ? 'LOW' : 'OK'}</div>
+                        </div>
+                        <div class="stock-values">
+                            <div class="stock-val">
+                                <div class="stock-val-num">${s.current}</div>
+                                <div class="stock-val-lbl">Current</div>
+                            </div>
+                            <div class="stock-val">
+                                <div class="stock-val-num">${s.min}</div>
+                                <div class="stock-val-lbl">Min</div>
+                            </div>
+                            <div class="stock-val">
+                                <div class="stock-val-num">${s.prepared}</div>
+                                <div class="stock-val-lbl">Frame</div>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            };
+            
+            target.innerHTML = `
+                <div class="section-block">
+                    <div class="section-title ss">
+                        SS Machines
+                        <span class="section-count">${ssItems.length} total</span>
+                    </div>
+                    ${renderStockCards(ssItems)}
+                </div>
+
+                <div class="section-block">
+                    <div class="section-title ms">
+                        MS Machines
+                        <span class="section-count">${msItems.length} total</span>
+                    </div>
+                    ${renderStockCards(msItems)}
+                </div>
+
+                ${otherItems.length > 0 ? `
+                <div class="section-block">
+                    <div class="section-title" style="color: var(--orange);">
+                        Other Machines
+                        <span class="section-count">${otherItems.length} total</span>
+                    </div>
+                    ${renderStockCards(otherItems)}
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // INIT
+        loadSettings();
+        renderHistory();
+        runSync();
+
+    </script>
+</body>
+</html>

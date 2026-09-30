@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Production Line</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* === BOOT SCREEN === */
+        #boot-screen {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+            padding: 40px 20px 30px;
+            padding-top: max(40px, env(safe-area-inset-top));
+            padding-bottom: max(30px, env(safe-area-inset-bottom));
+        }
+        #boot-screen.visible { display: flex; }
+
+        .boot-header { text-align: center; margin-bottom: 30px; }
+        .boot-logo {
+            font-size: 56px;
+            margin-bottom: 12px;
+            display: inline-block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .boot-title {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #f97316, #fbbf24);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+        }
+        .boot-subtitle {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+            max-width: 320px;
+            margin: 0 auto;
+            line-height: 1.4;
+        }
+
+        .app-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .app-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .app-card:active {
+            transform: scale(0.97);
+            background: rgba(30, 41, 59, 0.9);
+        }
+        .app-card:hover {
+            border-color: var(--accent, #007aff);
+        }
+
+        .app-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+            background: var(--accent-bg, rgba(0, 122, 255, 0.15));
+            border: 1px solid var(--accent-border, rgba(0, 122, 255, 0.3));
+        }
+
+        .app-info { flex: 1; min-width: 0; }
+        .app-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-bottom: 3px;
+        }
+        .app-desc {
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.3;
+        }
+
+        .boot-footer {
+            text-align: center;
+            margin-top: auto;
+            padding-top: 30px;
+            font-size: 11px;
+            color: #475569;
+        }
+
+        /* === LOADING STATE === */
+        #loading-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        #loading-screen.visible { display: flex; }
+        .loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #f97316;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader-text { font-size: 15px; color: #94a3b8; font-weight: 600; }
+
+        /* === ERROR STATE === */
+        #error-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 30px;
+            text-align: center;
+        }
+        #error-screen.visible { display: flex; }
+        .error-icon { font-size: 64px; margin-bottom: 20px; }
+        .error-title { font-size: 20px; font-weight: 700; color: #ef4444; margin-bottom: 8px; }
+        .error-msg { font-size: 13px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; max-width: 320px; }
+        .retry-btn {
+            background: linear-gradient(90deg, #f97316, #fb923c);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        /* === APP IFRAME === */
+        #app-frame {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            background: #f2f2f7;
+        }
+        #app-frame.visible { display: block; }
+
+        /* === FLOATING SWITCH BUTTON === */
+        #switch-btn {
+            position: fixed;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            right: 16px;
+            z-index: 99999;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 10px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        #switch-btn.visible { display: flex; }
+        #switch-btn:active { transform: scale(0.95); }
+
+        /* === CONFIRM MODAL (for switching apps) === */
+        #confirm-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        #confirm-modal.visible { display: flex; }
+        .confirm-box {
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 18px;
+            padding: 25px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+        }
+        .confirm-icon { font-size: 40px; margin-bottom: 12px; }
+        .confirm-title { font-size: 18px; font-weight: 700; color: white; margin-bottom: 8px; }
+        .confirm-msg { font-size: 13px; color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
+        .confirm-actions { display: flex; gap: 10px; }
+        .confirm-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .confirm-btn.cancel { background: rgba(255, 255, 255, 0.08); color: white; }
+        .confirm-btn.confirm { background: linear-gradient(90deg, #ef4444, #f87171); color: white; }
+    </style>
+</head>
+<body>
+
+    <!-- BOOT SCREEN (app picker) -->
+    <div id="boot-screen">
+        <div class="boot-header">
+            <div class="boot-logo">⚡</div>
+            <div class="boot-title">Production Line</div>
+            <div class="boot-subtitle">Select which app you want to use on this device. Your choice will be remembered next time.</div>
+        </div>
+
+        <div class="app-list">
+            <div class="app-card" onclick="selectApp('wiring')" style="--accent: #ff9500; --accent-bg: rgba(255, 149, 0, 0.15); --accent-border: rgba(255, 149, 0, 0.3);">
+                <div class="app-icon">⚡</div>
+                <div class="app-info">
+                    <div class="app-name">Wiring Scanner</div>
+                    <div class="app-desc">For wiring department workers — scan serial + select machine</div>
+                </div>
+            </div>
+
+            <div class="app-card" onclick="selectApp('assembly')" style="--accent: #5ac8fa; --accent-bg: rgba(90, 200, 250, 0.15); --accent-border: rgba(90, 200, 250, 0.3);">
+                <div class="app-icon">⚙️</div>
+                <div class="app-info">
+                    <div class="app-name">Assembly Scanner</div>
+                    <div class="app-desc">For assembly department — scan serial, auto-detects machine</div>
+                </div>
+            </div>
+
+            <div class="app-card" onclick="selectApp('dispatch')" style="--accent: #5856d6; --accent-bg: rgba(88, 86, 214, 0.15); --accent-border: rgba(88, 86, 214, 0.3);">
+                <div class="app-icon">🚚</div>
+                <div class="app-info">
+                    <div class="app-name">Dispatch Scanner</div>
+                    <div class="app-desc">For dispatch department — scan serial + customer + invoice</div>
+                </div>
+            </div>
+
+            <div class="app-card" onclick="selectApp('data-entry')" style="--accent: #34c759; --accent-bg: rgba(52, 199, 89, 0.15); --accent-border: rgba(52, 199, 89, 0.3);">
+                <div class="app-icon">📋</div>
+                <div class="app-info">
+                    <div class="app-name">Worker Action List</div>
+                    <div class="app-desc">Stock management + add new machines (admin)</div>
+                </div>
+            </div>
+
+            <div class="app-card" onclick="selectApp('dashboard')" style="--accent: #ff2d55; --accent-bg: rgba(255, 45, 85, 0.15); --accent-border: rgba(255, 45, 85, 0.3);">
+                <div class="app-icon">📊</div>
+                <div class="app-info">
+                    <div class="app-name">Dashboard</div>
+                    <div class="app-desc">Live stock + production overview (read-only)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="boot-footer">
+            v1.0 • Experimental Combined Launcher
+        </div>
+    </div>
+
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen">
+        <div class="loader-spinner"></div>
+        <div class="loader-text" id="loader-text">Loading app...</div>
+    </div>
+
+    <!-- ERROR SCREEN -->
+    <div id="error-screen">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">Cannot Load App</div>
+        <div class="error-msg" id="error-msg">Please check your internet connection and try again.</div>
+        <button class="retry-btn" onclick="retryLoad()">Try Again</button>
+    </div>
+
+    <!-- APP IFRAME (the chosen app loads here) -->
+    <iframe id="app-frame"></iframe>
+
+    <!-- FLOATING SWITCH BUTTON -->
+    <button id="switch-btn" onclick="showConfirmSwitch()">
+        ↩ <span>Switch</span>
+    </button>
+
+    <!-- CONFIRM MODAL -->
+    <div id="confirm-modal">
+        <div class="confirm-box">
+            <div class="confirm-icon">🔄</div>
+            <div class="confirm-title">Switch App?</div>
+            <div class="confirm-msg">This will return to the app picker. You can select a different app for this device.</div>
+            <div class="confirm-actions">
+                <button class="confirm-btn cancel" onclick="hideConfirmSwitch()">Cancel</button>
+                <button class="confirm-btn confirm" onclick="confirmSwitch()">Switch</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === CONFIG: GitHub raw URLs for each app ===
+        // Using the GitHub repo we just uploaded so the apps are always available
+        const APPS = {
+            'wiring': {
+                name: 'Wiring Scanner',
+                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/wiring-new.html'
+            },
+            'assembly': {
+                name: 'Assembly Scanner',
+                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/assembly-new.html'
+            },
+            'dispatch': {
+                name: 'Dispatch Scanner',
+                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dispatch-new.html'
+            },
+            'data-entry': {
+                name: 'Worker Action List',
+                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/data-entry-new.html'
+            },
+            'dashboard': {
+                name: 'Dashboard',
+                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dashboard-new.html'
+            }
+        };
+
+        // localStorage keys
+        const LS_SELECTED = 'pl_selected_app';
+        const LS_HTML_CACHE_PREFIX = 'pl_app_html_';
+
+        // === STATE ===
+        let currentApp = null;
+        let isLoading = false;
+
+        // === HELPERS ===
+        function showScreen(screenId) {
+            ['boot-screen', 'loading-screen', 'error-screen'].forEach(id => {
+                document.getElementById(id).classList.toggle('visible', id === screenId);
+            });
+            document.getElementById('app-frame').classList.remove('visible');
+            document.getElementById('switch-btn').classList.remove('visible');
+        }
+
+        function showApp() {
+            ['boot-screen', 'loading-screen', 'error-screen'].forEach(id => {
+                document.getElementById(id).classList.remove('visible');
+            });
+            document.getElementById('app-frame').classList.add('visible');
+            document.getElementById('switch-btn').classList.add('visible');
+        }
+
+        // === APP SELECTION ===
+        async function selectApp(appName) {
+            if (isLoading) return;
+            isLoading = true;
+            currentApp = appName;
+
+            const app = APPS[appName];
+            if (!app) {
+                isLoading = false;
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loader-text').textContent = 'Loading ' + app.name + '...';
+            showScreen('loading-screen');
+
+            // Try to fetch the app's HTML
+            try {
+                const response = await fetch(app.url, { cache: 'no-cache' });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const html = await response.text();
+
+                // Cache the HTML for offline use next time
+                try {
+                    localStorage.setItem(LS_HTML_CACHE_PREFIX + appName, html);
+                } catch (e) {
+                    console.warn('Could not cache HTML (might be too large):', e);
+                }
+
+                // Save the selection
+                localStorage.setItem(LS_SELECTED, appName);
+
+                // Load the app in the iframe
+                loadAppInIframe(html);
+                isLoading = false;
+            } catch (e) {
+                console.error('Failed to load app:', e);
+                document.getElementById('error-msg').textContent = 
+                    'Could not load ' + app.name + '. Please check your internet connection and try again.';
+                showScreen('error-screen');
+                isLoading = false;
+            }
+        }
+
+        function loadAppInIframe(html) {
+            const frame = document.getElementById('app-frame');
+            frame.srcdoc = html;
+            showApp();
+        }
+
+        function retryLoad() {
+            if (currentApp) {
+                selectApp(currentApp);
+            } else {
+                showScreen('boot-screen');
+            }
+        }
+
+        // === SWITCH APP ===
+        function showConfirmSwitch() {
+            document.getElementById('confirm-modal').classList.add('visible');
+        }
+
+        function hideConfirmSwitch() {
+            document.getElementById('confirm-modal').classList.remove('visible');
+        }
+
+        function confirmSwitch() {
+            hideConfirmSwitch();
+            // Clear the selection
+            localStorage.removeItem(LS_SELECTED);
+            // Optionally clear the cached HTML too
+            if (currentApp) {
+                localStorage.removeItem(LS_HTML_CACHE_PREFIX + currentApp);
+            }
+            currentApp = null;
+            // Clear the iframe
+            document.getElementById('app-frame').srcdoc = '';
+            // Show boot screen
+            showScreen('boot-screen');
+        }
+
+        // === INIT (runs on page load) ===
+        (function init() {
+            const selectedApp = localStorage.getItem(LS_SELECTED);
+
+            if (selectedApp && APPS[selectedApp]) {
+                // User already selected an app — try to load from cache first
+                const cachedHtml = localStorage.getItem(LS_HTML_CACHE_PREFIX + selectedApp);
+                if (cachedHtml) {
+                    // Load from cache (instant, no network needed)
+                    currentApp = selectedApp;
+                    loadAppInIframe(cachedHtml);
+                    // Also fetch fresh in background to update cache (silent)
+                    fetch(APPS[selectedApp].url, { cache: 'no-cache' })
+                        .then(r => r.text())
+                        .then(html => {
+                            try {
+                                localStorage.setItem(LS_HTML_CACHE_PREFIX + selectedApp, html);
+                            } catch (e) {}
+                        })
+                        .catch(() => {});
+                } else {
+                    // No cache, fetch fresh
+                    selectApp(selectedApp);
+                }
+            } else {
+                // No selection — show boot screen
+                showScreen('boot-screen');
+            }
+        })();
+    </script>
+</body>
+</html>

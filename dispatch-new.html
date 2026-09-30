@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Dispatch Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { --bg: #f2f2f7; --blue: #007aff; --red: #ff3b30; --green: #34c759; --white: #ffffff; --sub: #8e8e93; --orange: #ff9500; }
+
+        /* LOADING SCREEN */
+        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--white); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease-out; }
+        #loading-screen.fade-out { opacity: 0; pointer-events: none; }
+        .loader-logo { font-size: 48px; margin-bottom: 20px; }
+        .loader-text { font-size: 16px; font-weight: 600; color: var(--sub); margin-bottom: 10px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--green); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* MAIN APP */
+        #main-container { display: none; flex-direction: column; height: 100%; width: 100%; }
+        #main-container.visible { display: flex; }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, sans-serif; color: #1c1c1e; }
+
+        .camera-container { height: 45%; flex-shrink: 0; background: #000; position: relative; }
+        #reader { width: 100%; height: 100%; }
+        .scanner-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .scanner-cutout { position: relative; width: 90%; height: 85%; box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.6); border-radius: 12px; border: 3px solid rgba(255,255,255,0.4); }
+        .scanner-cutout::before, .scanner-cutout::after, .scanner-corner-bl::before, .scanner-corner-bl::after { content: ""; position: absolute; width: 40px; height: 40px; border: 6px solid white; }
+        .scanner-cutout::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+        .scanner-cutout::after { top: 0; right: 0; border-left: none; border-bottom: none; }
+        .scanner-corner-bl { position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; }
+        .scanner-corner-bl::before { bottom: 0; left: 0; border-right: none; border-top: none; }
+        .scanner-corner-bl::after { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+        .content-wrapper { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
+        .container { padding: 15px; padding-bottom: 30px; }
+        .input-card { background: var(--white); padding: 20px; border-radius: 28px; border: 1px solid #e5e5ea; box-shadow: 0 12px 30px rgba(0,0,0,0.05); position: relative; z-index: 100; }
+        
+        .sync-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .sync-info { font-size: 9px; font-weight: 800; color: var(--sub); text-transform: uppercase; }
+        .sync-actions { display: flex; gap: 6px; align-items: center; }
+        .btn-sync { background: var(--bg); border: none; padding: 8px 12px; border-radius: 10px; font-size: 10px; font-weight: 800; color: var(--blue); cursor: pointer; }
+        .btn-hist { background: var(--bg); border: none; padding: 8px 12px; border-radius: 10px; font-size: 16px; cursor: pointer; }
+        .pending-tag { background: var(--orange); color: white; padding: 2px 6px; border-radius: 5px; margin-left: 5px; display: none; font-size:9px; }
+
+        .action-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e5e5ea; background: var(--bg); font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: #555; }
+        .action-btn.active { background: #ffcc00; border-color: #ffcc00; color: #000; }
+
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 9px; font-weight: 800; color: var(--sub); text-transform: uppercase; margin-bottom: 4px; margin-left: 4px; }
+        .input-group input { width: 100%; padding: 15px; border-radius: 15px; border: 1px solid #e5e5ea; font-size: 16px; box-sizing: border-box; outline: none; background: #f9f9fb; }
+        
+        .btn-submit { width: 100%; background: var(--green); color: white; border: none; padding: 20px; border-radius: 20px; font-size: 16px; font-weight: 800; margin-top: 10px; cursor: pointer; }
+        .btn-submit:disabled { background: #aeaeb2; opacity: 0.6; }
+        .btn-submit.offline { background: #8e8e93; }
+
+        .history-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
+        .history-modal.open { transform: translateY(0); }
+        .modal-header { background: var(--white); padding: 15px 20px; border-bottom: 1px solid #e5e5ea; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .modal-close { font-size: 24px; color: var(--blue); background: none; border: none; cursor: pointer; font-weight: 300; }
+        .modal-content { flex: 1; overflow-y: auto; padding: 20px; }
+
+        .goal-card { background: var(--white); border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #e5e5ea; }
+        .goal-title { font-size: 10px; font-weight: 800; color: var(--sub); text-transform: uppercase; margin-bottom: 8px; }
+        .goal-bar-bg { width: 100%; height: 8px; background: #e5e5ea; border-radius: 4px; overflow: hidden; }
+        .goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--blue)); border-radius: 4px; transition: width 0.5s; }
+        .goal-text { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--text); display: flex; justify-content: space-between; }
+
+        .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f2f2f7; font-size: 13px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    </style>
+</head>
+<body>
+
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen">
+        <div class="loader-logo">⚡</div>
+        <div class="loader-text">Syncing Data...</div>
+        <div class="spinner"></div>
+    </div>
+
+    <div id="main-container">
+        <div class="camera-container">
+            <div id="reader"></div>
+            <div class="scanner-overlay"><div class="scanner-cutout"></div></div>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="container">
+                <div class="input-card">
+                    <div class="sync-bar">
+                        <div class="sync-info">Sync: <span id="sync-time">...</span> <span id="pending-count" class="pending-tag">0 PENDING</span></div>
+                        <div class="sync-actions">
+                            <button id="zoom-btn" class="action-btn" onclick="toggleZoom()">1x</button>
+                            <button id="flash-btn" class="action-btn" onclick="toggleFlash()">🔦</button>
+                            <button class="btn-sync" id="sync-btn" onclick="runSync()">🔄</button>
+                            <button class="btn-hist" onclick="toggleHistory()">📜</button>
+                        </div>
+                    </div>
+
+                    <div id="dup-warn" style="display:none; color:var(--red); text-align:center; font-weight:bold; font-size:11px; margin-bottom:10px;">⚠️ DUPLICATE SERIAL</div>
+
+                    <div class="input-group"><label>Date</label><input type="date" id="field-date"></div>
+                    <div class="input-group"><label>Serial Number</label><input type="text" id="field-serial" placeholder="Scan or Type" oninput="handleSerialInput()"></div>
+                    <div class="input-group"><label>Customer Info</label><input type="text" id="field-customer" placeholder="Scan or Type Customer"></div>
+                    <div class="input-group"><label>Invoice Number</label><input type="text" id="field-invoice" placeholder="Scan or Type Invoice"></div>
+                    
+                    <button class="btn-submit" id="submit-btn" onclick="submitScan()" disabled>SUBMIT DISPATCH</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="history-modal">
+        <div class="modal-header">
+            <span class="modal-title">Dispatch History</span>
+            <button class="modal-close" onclick="toggleHistory()">×</button>
+        </div>
+        <div class="modal-content">
+            <div class="goal-card">
+                <div class="goal-title">Monthly Dispatch Goal</div>
+                <div class="goal-bar-bg"><div class="goal-bar-fill" id="goal-fill" style="width:0%"></div></div>
+                <div class="goal-text"><span id="goal-current">0</span><span id="goal-target">Target: 100</span></div>
+            </div>
+            <div id="history-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIG =================
+        // === NEW CONSOLIDATED URL === (single URL for all actions, routed via ?action= parameter)
+        // Replace this with your actual deployed ProductionLineCore URL
+        const CORE_URL = "https://script.google.com/macros/s/AKfycbxhC68ObyS_Z3swzMh0NjWgd9Qs2W3pOGu2HKjQRA5LIfXH_LHx_mEDyYFnCo-OxwNe/exec";
+        const SCRIPT_URL = CORE_URL + "?action=logDispatch";  // dispatch scan endpoint
+        const MACHINES_URL = CORE_URL + "?action=readMachines";  // machine list endpoint (for future use)
+        
+        // CSV URL for fetching dispatch history (used for duplicate detection + recent history display)
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/15Kj3Dw073HjuK54uYOEq4kn-04SeSOUqHydgZetDphI/export?format=csv&gid=200741550`;
+        // =========================================
+
+        let html5QrCode; let isTorchOn = false; let isZoomed = false;
+        const LS_HIST = 'dispatch_history'; const LS_TIME = 'dispatch_sync_time';
+        let pendingQueue = JSON.parse(localStorage.getItem('dispatch_pending') || "[]");
+
+        document.addEventListener("DOMContentLoaded", () => { initDate(); runSync(); });
+        function initDate() { document.getElementById('field-date').value = new Date().toISOString().split('T')[0]; }
+        function toggleHistory() { document.getElementById('history-modal').classList.toggle('open'); }
+
+        async function toggleZoom() {
+            if (!html5QrCode) return;
+            const btn = document.getElementById('zoom-btn');
+            try {
+                const capabilities = html5QrCode.getRunningTrackCapabilities();
+                if (capabilities && capabilities.zoom) {
+                    isZoomed = !isZoomed;
+                    await html5QrCode.applyVideoConstraints({ zoom: isZoomed ? 2.0 : 1.0 });
+                    btn.innerText = isZoomed ? "2x" : "1x";
+                    btn.classList.toggle('active', isZoomed);
+                } else { alert("Zoom not supported"); }
+            } catch (e) {}
+        }
+
+        async function toggleFlash() {
+            if (!html5QrCode) return;
+            const btn = document.getElementById('flash-btn');
+            try {
+                const cap = html5QrCode.getRunningTrackCapabilities();
+                if (cap.torch) {
+                    isTorchOn = !isTorchOn;
+                    await html5QrCode.applyVideoConstraints({ torch: isTorchOn });
+                    btn.innerText = isTorchOn ? "💡" : "🔦";
+                    btn.classList.toggle('active', isTorchOn);
+                }
+            } catch (e) {}
+        }
+
+        // --- SYNC LOGIC ---
+        async function runSync() {
+            const btn = document.getElementById('sync-btn');
+            btn.innerText = "...";
+            try {
+                const res = await fetch(CSV_URL); const text = await res.text(); parseDispatch(text);
+                localStorage.setItem(LS_TIME, new Date().toLocaleTimeString());
+                document.getElementById('sync-time').innerText = localStorage.getItem(LS_TIME);
+                updateGoal(); renderHistory(); updatePendingUI(); handleSerialInput(); 
+                if (!html5QrCode) startScanner();
+                btn.innerText = "🔄";
+                
+                // HIDE LOADING SCREEN
+                const loader = document.getElementById('loading-screen');
+                const mainContainer = document.getElementById('main-container');
+                loader.classList.add('fade-out');
+                mainContainer.classList.add('visible');
+                setTimeout(() => { loader.style.display = 'none'; }, 500);
+
+            } catch (e) { 
+                if (!html5QrCode) startScanner(); 
+            }
+        }
+
+        function parseDispatch(text) {
+            const rows = text.split('\n'); const history = [];
+            const now = new Date(); const cutoff = new Date(now.setDate(now.getDate() - 30));
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].split(',');
+                const serial = (cells[0] || "").trim().toUpperCase();
+                const invoice = (cells[1] || "").trim();
+                const customer = (cells[2] || "Unknown").trim();
+                const dateStr = (cells[3] || "").trim();
+                const dateObj = parseDate(dateStr);
+                if (serial.startsWith("KM") || serial.startsWith("SSKM")) {
+                    if (dateObj >= cutoff) { history.push({ serial, customer, invoice, date: dateStr, status: 'synced' }); }
+                }
+            }
+            localStorage.setItem(LS_HIST, JSON.stringify(history));
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 25, qrbox: (vw, vh) => { return { width: vw * 0.90, height: vh * 0.85 }; } };
+            html5QrCode.start({ facingMode: "environment" }, config, 
+                (text) => {
+                    const up = text.trim().toUpperCase();
+                    if (up.startsWith("KM") || up.startsWith("SSKM")) {
+                        // Machine serial number
+                        document.getElementById('field-serial').value = up;
+                    } else if (up.match(/^D\d{3,}$/) || text.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) {
+                        // Invoice identification (FIXED):
+                        // - "D" + 3+ digits (D26093009, D123) — NOT just "D" prefix (excludes "David", "D.Alexander")
+                        // - Pure 3-6 digit number (was 4-6, now includes 3-digit per user request)
+                        // - Text starting with "INVOICE" (Invoice No 1, Invoice No.5)
+                        document.getElementById('field-invoice').value = up;
+                    } else if (text.length > 3 && !up.startsWith("HTTP")) {
+                        // Customer name (alphabetic text)
+                        document.getElementById('field-customer').value = text;
+                    }
+                    vibe(50); handleSerialInput();
+                }
+            ).catch(e => console.log("Camera Error", e));
+        }
+
+        function handleSerialInput() { checkDup(); }
+
+        function checkDup() {
+            const s = document.getElementById('field-serial').value.trim().toUpperCase();
+            const warn = document.getElementById('dup-warn'); const btn = document.getElementById('submit-btn');
+            if (!s) { btn.disabled = true; warn.style.display = 'none'; return; }
+            const history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+            const isDup = history.some(x => x.serial === s) || pendingQueue.some(x => x.serial === s);
+            warn.style.display = isDup ? 'block' : 'none';
+            btn.disabled = isDup;
+        }
+
+        async function submitScan() {
+            const s = document.getElementById('field-serial').value.trim().toUpperCase();
+            const c = document.getElementById('field-customer').value || ""; 
+            const i = document.getElementById('field-invoice').value || "";
+            const d = document.getElementById('field-date').value;
+            const btn = document.getElementById('submit-btn');
+            if (!s) { alert("Scan Serial"); return; }
+
+            btn.disabled = true; btn.innerText = "SENDING...";
+            const data = { serial: s, customer: c, invoice: i, date: d };
+
+            try {
+                if (!navigator.onLine) throw new Error("Offline");
+                await fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
+                btn.innerText = "SUCCESS ✓"; btn.classList.add("success");
+                let history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+                history.push({ serial: s, customer: c, invoice: i, date: d, status: 'synced' });
+                localStorage.setItem(LS_HIST, JSON.stringify(history));
+            } catch (e) {
+                pendingQueue.push(data); localStorage.setItem('dispatch_pending', JSON.stringify(pendingQueue));
+                btn.innerText = "SAVED OFFLINE 📦"; btn.classList.add("offline");
+                let history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+                history.push({ serial: s, customer: c, invoice: i, date: d, status: 'pending' });
+                localStorage.setItem(LS_HIST, JSON.stringify(history));
+            }
+
+            vibe([100, 50, 100]); updatePendingUI(); updateGoal(); renderHistory();
+
+            setTimeout(() => {
+                document.getElementById('field-serial').value = "";
+                document.getElementById('field-customer').value = "";
+                document.getElementById('field-invoice').value = "";
+                btn.innerText = "SUBMIT DISPATCH";
+                btn.classList.remove("success", "offline");
+                handleSerialInput();
+            }, 1500);
+        }
+
+        function parseDate(s) { if (!s) return new Date(0); const p = s.split(/[\/\-]/); let date; if (p[0].length === 4) date = new Date(p[0], p[1]-1, p[2]); else date = new Date(p[2], p[1]-1, p[0]); return date; }
+        
+        function updateGoal() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+            let count = history.filter(i => { const d = parseDate(i.date); return d >= start && d < end; }).length;
+            const goal = 100; const pct = Math.min((count/goal)*100, 100);
+            document.getElementById('goal-fill').style.width = pct + '%';
+            document.getElementById('goal-current').innerText = count;
+        }
+        
+        function renderHistory() {
+            const target = document.getElementById('history-list');
+            const history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+            const list = history.slice(-50).reverse();
+            target.innerHTML = list.map(i => `
+                <div class="history-item">
+                    <span style="font-weight:600;">
+                        <span class="status-dot" style="background:${i.status==='pending'?'var(--orange)':'var(--green)'}"></span>
+                        ${i.customer} <span style="opacity:0.6; font-size:11px">${i.serial.substring(0,10)}</span>
+                    </span>
+                    <span style="color:var(--sub); font-size:12px">${i.date}</span>
+                </div>
+            `).join('');
+        }
+
+        function updatePendingUI() { const el = document.getElementById('pending-count'); el.innerText = pendingQueue.length + " PENDING"; el.style.display = pendingQueue.length > 0 ? 'inline-block' : 'none'; }
+        
+        async function autoPush() {
+            if (pendingQueue.length === 0 || !navigator.onLine) return;
+            const data = pendingQueue[0];
+            try {
+                await fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
+                pendingQueue.shift(); localStorage.setItem('dispatch_pending', JSON.stringify(pendingQueue)); updatePendingUI();
+                let history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
+                const idx = history.findIndex(x => x.serial === data.serial && x.status === 'pending');
+                if (idx !== -1) history[idx].status = 'synced';
+                localStorage.setItem(LS_HIST, JSON.stringify(history));
+                renderHistory(); updateGoal();
+                if (pendingQueue.length > 0) autoPush();
+            } catch(e) {}
+        }
+        setInterval(autoPush, 5000);
+        function vibe(p) { if (navigator.vibrate) navigator.vibrate(p); }
+    </script>
+</body>
+</html>

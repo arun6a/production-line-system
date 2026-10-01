@@ -217,7 +217,7 @@ function isKnownSerial(serial) {
         const LS_HIST = 'dispatch_history'; const LS_TIME = 'dispatch_sync_time';
         let pendingQueue = JSON.parse(localStorage.getItem('dispatch_pending') || "[]");
 
-        document.addEventListener("DOMContentLoaded", () => { initDate(); fetchPrefixMap(MACHINES_URL); runSync(); });
+        document.addEventListener("DOMContentLoaded", async () => { initDate(); await fetchPrefixMap(MACHINES_URL); runSync(); });
         function initDate() { document.getElementById('field-date').value = new Date().toISOString().split('T')[0]; }
         function toggleHistory() { document.getElementById('history-modal').classList.toggle('open'); }
 

@@ -818,7 +818,17 @@
         // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
         let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
 
-        function isKnownSerial(serial) {
+        
+        // Accepts ANY serial that looks like one (not just known prefixes)
+        function looksLikeSerial(text) {
+            if (!text) return false;
+            const up = text.toString().trim().toUpperCase();
+            if (up.startsWith('HTTP') || up.length < 5) return false;
+            // Must be alphanumeric, contain at least one letter and one digit
+            return /^[A-Z0-9]+$/.test(up) && /[A-Z]/.test(up) && /\d/.test(up);
+        }
+
+function isKnownSerial(serial) {
             if (!serial) return false;
             const upper = serial.toString().toUpperCase();
             const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
@@ -938,7 +948,7 @@
             const data = rows.map((row, idx) => {
                 const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
                 let fDate = null, fSerial = null, fInvoice = "N/A", names = [];
-                cells.forEach(val => { const up = val.toUpperCase(); if (isKnownSerial(up)) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
+                cells.forEach(val => { const up = val.toUpperCase(); if (looksLikeSerial(up)) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
                 if(!fSerial) return null;
                 let fCust = names.filter(n => n.includes(" ")).reduce((a,b) => a.length > b.length ? a : b, names[0] || "Unknown Customer");
                 if(fCust !== "Unknown Customer") customerFrequency[fCust] = (customerFrequency[fCust] || 0) + 1;

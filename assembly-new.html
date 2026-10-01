@@ -257,10 +257,10 @@ function isKnownSerial(serial) {
         let pendingQueue = JSON.parse(localStorage.getItem('assembly_pending') || "[]");
         let selectedMachine = "";
 
-        document.addEventListener("DOMContentLoaded", () => { 
+        document.addEventListener("DOMContentLoaded", async () => { 
             initDate();
-            fetchMachines();  // NEW — fetch machine list from registry
-    fetchPrefixMap(MACHINES_URL);  // NEW — fetch dynamic prefix map
+            await fetchPrefixMap(MACHINES_URL);  // CRITICAL: load prefix map BEFORE parsing
+            fetchMachines();  // fetch machine list for button grid
             runSync(); 
         });
 

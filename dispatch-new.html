@@ -296,17 +296,15 @@ function isKnownSerial(serial) {
             html5QrCode.start({ facingMode: "environment" }, config, 
                 (text) => {
                     const up = text.trim().toUpperCase();
-                    if (looksLikeSerial(up)) {
-                        // Machine serial number
-                        document.getElementById('field-serial').value = up;
-                    } else if (up.match(/^D\d{3,}$/) || text.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) {
-                        // Invoice identification (FIXED):
-                        // - "D" + 3+ digits (D26093009, D123) — NOT just "D" prefix (excludes "David", "D.Alexander")
-                        // - Pure 3-6 digit number (was 4-6, now includes 3-digit per user request)
-                        // - Text starting with "INVOICE" (Invoice No 1, Invoice No.5)
+                    // Check INVOICE FIRST — D+digits, pure 3-6 digits, INVOICE prefix
+                    // (must check before serial because "D26093009" also matches looksLikeSerial)
+                    if (up.match(/^D\d{3,}$/) || text.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) {
                         document.getElementById('field-invoice').value = up;
+                    } else if (looksLikeSerial(up)) {
+                        // Machine serial number — check AFTER invoice
+                        document.getElementById('field-serial').value = up;
                     } else if (text.length > 3 && !up.startsWith("HTTP")) {
-                        // Customer name (alphabetic text)
+                        // Customer name
                         document.getElementById('field-customer').value = text;
                     }
                     vibe(50); handleSerialInput();

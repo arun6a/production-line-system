@@ -344,11 +344,11 @@ function isKnownSerial(serial) {
             btn.innerText = "...";
             
             try {
-                const wRes = await fetch(WIRING_CSV_URL);
+                const wRes = await fetch(WIRING_CSV_URL + '&t=' + Date.now());
                 const wText = await wRes.text();
                 parseAndStoreWiring(wText);
 
-                const aRes = await fetch(ASSEMBLY_CSV_URL);
+                const aRes = await fetch(ASSEMBLY_CSV_URL + '&t=' + Date.now());
                 const aText = await aRes.text();
                 parseAndStoreAssembly(aText);
 

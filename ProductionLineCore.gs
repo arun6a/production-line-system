@@ -154,10 +154,73 @@ function readMachines() {
         min_stock:       Number(row[8]) || 0
       });
     }
-    return jsonResponse({ machines: machines });
+    return jsonResponse({ machines: machines, prefixMap: buildPrefixMap(machines) });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
+}
+
+/**
+ * buildPrefixMap() — builds a {prefix: materialType} map from machine list.
+ * Used by readMachines() to return prefixMap to HTML apps.
+ */
+function buildPrefixMap(machines) {
+  const map = {};
+  for (const m of machines) {
+    if (m.status === 'active' && m.serial_prefix) {
+      map[m.serial_prefix.toString().toUpperCase()] = m.material_type.toString().toUpperCase();
+    }
+  }
+  if (!map['SSKM']) map['SSKM'] = 'SS';
+  if (!map['KM']) map['KM'] = 'MS';
+  return map;
+}
+
+/**
+ * getPrefixMap() — returns the prefix→materialType map from MachineRegistry.
+ * Cached per-request to avoid repeated reads.
+ */
+let _prefixMapCache = null;
+function getPrefixMap() {
+  if (_prefixMapCache) return _prefixMapCache;
+  try {
+    const sheet = getRegistrySheet();
+    if (!sheet) return { 'SSKM': 'SS', 'KM': 'MS' };
+    const data = sheet.getDataRange().getValues();
+    const map = {};
+    for (let i = 1; i < data.length; i++) {
+      const prefix = data[i][3];
+      const materialType = data[i][2];
+      const status = data[i][7];
+      if (prefix && materialType && status === 'active') {
+        map[prefix.toString().toUpperCase()] = materialType.toString().toUpperCase();
+      }
+    }
+    if (!map['SSKM']) map['SSKM'] = 'SS';
+    if (!map['KM']) map['KM'] = 'MS';
+    _prefixMapCache = map;
+    return map;
+  } catch (e) {
+    return { 'SSKM': 'SS', 'KM': 'MS' };
+  }
+}
+
+/**
+ * getMaterialTypeFromSerial() — determines material type (SS/MS/etc.) from a serial number.
+ * Uses the dynamic prefix map from MachineRegistry (NOT hardcoded SSKM/KM).
+ * Returns null if no prefix matches.
+ */
+function getMaterialTypeFromSerial(serial) {
+  if (!serial) return null;
+  const upperSerial = serial.toString().toUpperCase();
+  const map = getPrefixMap();
+  const prefixes = Object.keys(map).sort((a, b) => b.length - a.length);
+  for (const prefix of prefixes) {
+    if (upperSerial.startsWith(prefix)) {
+      return map[prefix];
+    }
+  }
+  return null;
 }
 
 /**
@@ -330,7 +393,7 @@ function logWiringScan(data) {
     sheet.appendRow(rowValues);
 
     // Update stock internally (no HTTP call needed since we're consolidated)
-    const prefix = data.serial.startsWith("SSKM") ? "SS" : "MS";
+    const prefix = getMaterialTypeFromSerial(data.serial) || 'MS';
     const fullMachineName = `${prefix} ${data.machineType}`;
     updateStockInternal(fullMachineName, 'wiring', -1);
 
@@ -377,7 +440,7 @@ function logAssemblyScan(data) {
     rowValues[colIndex - 1] = data.serial;
     sheet.appendRow(rowValues);
 
-    const prefix = data.serial.startsWith("SSKM") ? "SS" : "MS";
+    const prefix = getMaterialTypeFromSerial(data.serial) || 'MS';
     const fullMachineName = `${prefix} ${data.machineType}`;
     updateStockInternal(fullMachineName, 'assembly', 1);
 
@@ -546,7 +609,7 @@ function lookupMachineInStageSheet(stage, serialToFind) {
       if (isJunkColumn(header)) continue;
 
       // Found the serial in a non-junk machine column — return the machine name
-      const prefix = serialToFind.startsWith("SSKM") ? "SS" : "MS";
+      const prefix = getMaterialTypeFromSerial(serialToFind) || 'MS';
       return `${prefix} ${header}`;
     }
     return null;  // serial not found in any active machine column

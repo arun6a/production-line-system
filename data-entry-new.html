@@ -439,7 +439,7 @@ function isKnownSerial(serial) {
                 await fetchMachines();
     fetchPrefixMap(CONFIG.machinesUrl);  // NEW — fetch dynamic prefix map
                 
-                const [wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.wiring), fetch(CONFIG.assembly), fetch(CONFIG.stock) ]);
+                const [wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.wiring + '&t=' + Date.now()), fetch(CONFIG.assembly + '&t=' + Date.now()), fetch(CONFIG.stock + '&t=' + Date.now()) ]);
                 DB.wiring = parseProductionSheet(await wRes.text());
                 DB.assembly = parseProductionSheet(await aRes.text());
                 DB.stock = parseBaseStockCSV(await sRes.text());

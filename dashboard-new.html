@@ -850,12 +850,21 @@ function isKnownSerial(serial) {
         }
 
         async function fetchPrefixMap(url) {
+            // Load from localStorage FIRST (instant — no network delay)
+            try {
+                const cached = localStorage.getItem('prefix_map_cache');
+                if (cached) {
+                    PREFIX_MAP = JSON.parse(cached);
+                    console.log('Loaded cached prefix map:', PREFIX_MAP);
+                }
+            } catch(e) {}
+
+            // Fetch fresh in background (updates cache for next time)
             try {
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data.prefixMap) {
                     PREFIX_MAP = data.prefixMap;
-                    console.log('Loaded prefix map:', PREFIX_MAP);
                 } else if (data.machines) {
                     PREFIX_MAP = {};
                     data.machines.forEach(m => {
@@ -865,12 +874,14 @@ function isKnownSerial(serial) {
                     });
                     if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
                     if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
-                    console.log('Built prefix map from machines:', PREFIX_MAP);
                 }
+                // Save to localStorage for next app open (instant load)
+                localStorage.setItem('prefix_map_cache', JSON.stringify(PREFIX_MAP));
+                console.log('Updated prefix map cache');
             } catch (err) {
-                console.warn('Prefix map fetch failed, using default:', err);
+                console.warn('Prefix map fetch failed, using cached/default:', err);
             }
-            // Re-render/re-sync after PREFIX_MAP loads — OUTSIDE try-catch (runs on BOTH success and failure)
+            // Re-render with loaded prefix map
             try {
                 if (typeof _prefixMapResynced === 'undefined') _prefixMapResynced = false;
                 if (!_prefixMapResynced) {
@@ -881,7 +892,7 @@ function isKnownSerial(serial) {
                     else if (typeof runSync === 'function') runSync();
                     console.log('Re-rendered after PREFIX_MAP loaded');
                 }
-            } catch(e) { console.warn('Re-render after prefix map failed:', e); }
+            } catch(e) { console.warn('Re-render failed:', e); }
         }
         // === HASH-BASED STABLE COLOR ASSIGNMENT ===
         // Each machine name gets a STABLE color based on its name hash.

@@ -179,7 +179,17 @@
         // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
         let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
 
-        function isKnownSerial(serial) {
+        
+        // Accepts ANY serial that looks like one (not just known prefixes)
+        function looksLikeSerial(text) {
+            if (!text) return false;
+            const up = text.toString().trim().toUpperCase();
+            if (up.startsWith('HTTP') || up.length < 5) return false;
+            // Must be alphanumeric, contain at least one letter and one digit
+            return /^[A-Z0-9]+$/.test(up) && /[A-Z]/.test(up) && /\d/.test(up);
+        }
+
+function isKnownSerial(serial) {
             if (!serial) return false;
             const upper = serial.toString().toUpperCase();
             const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
@@ -377,7 +387,7 @@
                 const cells = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
                 for (const [idx, modelName] of Object.entries(machineCols)) {
                     const s = cells[idx] ? cells[idx].trim().toUpperCase() : "";
-                    if (isKnownSerial(s)) map[s] = modelName;
+                    if (looksLikeSerial(s)) map[s] = modelName;
                 }
             }
             localStorage.setItem(LS_WIRE_MAP, JSON.stringify(map));
@@ -411,7 +421,7 @@
                 
                 for (const [idx, name] of Object.entries(machineCols)) {
                     const s = cells[idx] ? cells[idx].trim().toUpperCase() : "";
-                    if (isKnownSerial(s)) {
+                    if (looksLikeSerial(s)) {
                         if (dateObj >= cutoff) {
                             history.push({ serial: s, type: name, date: dateStr, status: 'synced' });
                         }
@@ -429,7 +439,7 @@
                 { fps: 25, qrbox: (vw, vh) => { return { width: vw * 0.85, height: vh * 0.75 }; } }, 
                 (text) => {
                     const up = text.trim().toUpperCase();
-                    if (isKnownSerial(up)) {
+                    if (looksLikeSerial(up)) {
                         document.getElementById('field-serial').value = up;
                         handleSerialInput(); 
                         vibe(50);

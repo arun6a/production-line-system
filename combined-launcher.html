@@ -40,11 +40,10 @@
 
         .boot-header { text-align: center; margin-bottom: 28px; }
         .boot-logo {
-            width: 50px; height: auto; margin: 0 auto 10px; display: block;
-            border-radius: 10px;
-            opacity: 0.5;
-            filter: blur(1.5px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            width: 80px; height: auto; margin: 0 auto 10px; display: block;
+            border-radius: 16px;
+            opacity: 0.85;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             animation: logoFloat 3s ease-in-out infinite;
         }
         @keyframes logoFloat {
@@ -154,7 +153,8 @@
     <!-- BOOT SCREEN -->
     <div id="boot-screen">
         <div class="boot-header">
-            <img src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" class="boot-logo" alt="Logo">
+            <img src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" class="boot-logo" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <div style="font-size:52px;display:none">⚡</div>
         </div>
         <div class="app-list">
             <div class="app-card" onclick="selectApp('wiring')" style="--accent:#ff9500;--accent-bg:rgba(255,149,0,0.1);--accent-border:rgba(255,149,0,0.2);">

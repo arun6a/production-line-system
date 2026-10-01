@@ -139,7 +139,17 @@
         // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
         let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
 
-        function isKnownSerial(serial) {
+        
+        // Accepts ANY serial that looks like one (not just known prefixes)
+        function looksLikeSerial(text) {
+            if (!text) return false;
+            const up = text.toString().trim().toUpperCase();
+            if (up.startsWith('HTTP') || up.length < 5) return false;
+            // Must be alphanumeric, contain at least one letter and one digit
+            return /^[A-Z0-9]+$/.test(up) && /[A-Z]/.test(up) && /\d/.test(up);
+        }
+
+function isKnownSerial(serial) {
             if (!serial) return false;
             const upper = serial.toString().toUpperCase();
             const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
@@ -256,7 +266,7 @@
                 const customer = (cells[2] || "Unknown").trim();
                 const dateStr = (cells[3] || "").trim();
                 const dateObj = parseDate(dateStr);
-                if (isKnownSerial(serial)) {
+                if (looksLikeSerial(serial)) {
                     if (dateObj >= cutoff) { history.push({ serial, customer, invoice, date: dateStr, status: 'synced' }); }
                 }
             }
@@ -269,7 +279,7 @@
             html5QrCode.start({ facingMode: "environment" }, config, 
                 (text) => {
                     const up = text.trim().toUpperCase();
-                    if (isKnownSerial(up)) {
+                    if (looksLikeSerial(up)) {
                         // Machine serial number
                         document.getElementById('field-serial').value = up;
                     } else if (up.match(/^D\d{3,}$/) || text.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) {

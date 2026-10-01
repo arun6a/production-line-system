@@ -345,16 +345,15 @@ function getCourierSuggestions() {
 
 function getSettings() {
   try {
-    const sheet = getSheet(SETTINGS_SHEET_NAME);
+    let sheet = getSheet(SETTINGS_SHEET_NAME);
     if (!sheet) {
-      // Default settings if Settings tab doesn't exist
-      return jsonResponse({
-        settings: {
-          retentionDays: 21,
-          autoDeleteEnabled: true,
-          lastCleanup: null
-        }
-      });
+      // Auto-create Settings tab if missing (defensive)
+      sheet = ensureSettingsSheet();
+      if (!sheet) {
+        return jsonResponse({
+          settings: { retentionDays: 21, autoDeleteEnabled: true, lastCleanup: null }
+        });
+      }
     }
 
     const data = sheet.getDataRange().getValues();
@@ -377,8 +376,12 @@ function getSettings() {
 
 function updateSettings(data) {
   try {
-    const sheet = getSheet(SETTINGS_SHEET_NAME);
-    if (!sheet) return jsonResponse({ status: 'error', message: 'Settings sheet not found. Run setupSheet() first.' });
+    let sheet = getSheet(SETTINGS_SHEET_NAME);
+    if (!sheet) {
+      // Auto-create Settings tab if missing (defensive — fixes "Settings sheet not found" error)
+      sheet = ensureSettingsSheet();
+      if (!sheet) return jsonResponse({ status: 'error', message: 'Could not create Settings tab' });
+    }
 
     // Update or insert settings
     const retentionDays = parseInt(data.retentionDays);
@@ -409,6 +412,37 @@ function updateSettings(data) {
     return jsonResponse({ status: 'success', settings: { retentionDays: retentionDays, autoDeleteEnabled: retentionDays !== 0 } });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+/**
+ * ensureSettingsSheet() — creates the Settings tab if it doesn't exist.
+ * Called defensively by getSettings() and updateSettings().
+ * Returns the sheet object, or null on failure.
+ */
+function ensureSettingsSheet() {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+    if (sheet) return sheet;
+
+    // Create the Settings tab with default values
+    sheet = ss.insertSheet(SETTINGS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 2).setValues([['Setting', 'Value']]);
+    sheet.getRange(1, 1, 1, 2).setFontWeight('bold');
+    sheet.appendRow(['retentionDays', 21]);
+    sheet.appendRow(['autoDeleteEnabled', 'true']);
+    sheet.appendRow(['lastCleanup', '']);
+
+    // Auto-resize
+    sheet.autoResizeColumn(1);
+    sheet.autoResizeColumn(2);
+
+    Logger.log('Created Settings tab: ' + sheet.getName());
+    return sheet;
+  } catch (e) {
+    Logger.log('Failed to create Settings tab: ' + e.toString());
+    return null;
   }
 }
 

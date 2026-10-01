@@ -298,11 +298,19 @@ function addMachine(data) {
 
     // 2. Append column to each stage sheet (wiring, assembly, dispatch)
     // Stage sheets have columns: Date | CIDM | CSEM | ... | (junk cols)
-    // We append the new model_name as a new column at the end.
-    // Junk columns will still be skipped by the junk-skip logic during reverse-lookup.
+    // We append the new model_name as a new column at the end — BUT ONLY if it doesn't already exist.
+    // This prevents duplicate columns when adding MS variant of a model that already has SS variant
+    // (e.g., adding MS AIDM when SS AIDM was already added — both use the same "AIDM" column)
     for (const stage of ['wiring', 'assembly', 'dispatch']) {
       const stageSheet = getSheet(stage);
       if (stageSheet) {
+        // Check if a column with this model name already exists
+        const existingCol = findColumnByHeader(stageSheet, data.model_name);
+        if (existingCol !== -1) {
+          // Column already exists — skip appending (SS/MS variant of existing model)
+          // The serial prefix (ASKM/AMKM) determines the material type, not the column
+          continue;
+        }
         const lastCol = stageSheet.getLastColumn();
         stageSheet.getRange(1, lastCol + 1).setValue(data.model_name);
         addedColumns.push({ sheet: stageSheet, col: lastCol + 1 });

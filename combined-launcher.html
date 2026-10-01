@@ -8,302 +8,318 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: #0a0e1a;
             color: #f1f5f9;
             min-height: 100vh;
             overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* === ANIMATED GRADIENT BACKGROUND === */
+        #bg-gradient {
+            position: fixed; inset: 0; z-index: -2;
+            background: linear-gradient(135deg, #0a0e1a 0%, #111827 40%, #1a1040 70%, #0a0e1a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        #bg-glow {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at 20% 30%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, rgba(88, 86, 214, 0.08) 0%, transparent 50%);
+            animation: glowPulse 8s ease-in-out infinite alternate;
+        }
+        @keyframes glowPulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.1); }
         }
 
         /* === BOOT SCREEN === */
         #boot-screen {
-            display: none;
-            flex-direction: column;
-            min-height: 100vh;
+            display: none; flex-direction: column; min-height: 100vh;
             padding: 40px 20px 30px;
             padding-top: max(40px, env(safe-area-inset-top));
             padding-bottom: max(30px, env(safe-area-inset-bottom));
+            animation: fadeInUp 0.5s ease;
         }
         #boot-screen.visible { display: flex; }
-
-        .boot-header { text-align: center; margin-bottom: 30px; }
-        .boot-logo {
-            font-size: 56px;
-            margin-bottom: 12px;
-            display: inline-block;
-            animation: pulse 2s ease-in-out infinite;
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.08); }
+
+        .boot-header { text-align: center; margin-bottom: 35px; }
+        .boot-logo {
+            font-size: 52px; margin-bottom: 10px; display: inline-block;
+            animation: logoFloat 3s ease-in-out infinite;
+            filter: drop-shadow(0 4px 12px rgba(249, 115, 22, 0.3));
+        }
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-6px) scale(1.05); }
         }
         .boot-title {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #f97316, #fbbf24);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 26px; font-weight: 800; letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #f97316, #fbbf24, #f97316);
+            background-size: 200% auto;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             background-clip: text;
             margin-bottom: 6px;
+            animation: shimmer 3s linear infinite;
+        }
+        @keyframes shimmer {
+            to { background-position: 200% center; }
         }
         .boot-subtitle {
-            font-size: 13px;
-            color: #94a3b8;
-            font-weight: 500;
-            max-width: 320px;
-            margin: 0 auto;
-            line-height: 1.4;
+            font-size: 12px; color: #64748b; font-weight: 500;
+            max-width: 300px; margin: 0 auto; line-height: 1.5;
         }
 
+        /* === APP CARDS === */
         .app-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            max-width: 480px;
-            margin: 0 auto;
-            width: 100%;
+            display: flex; flex-direction: column; gap: 10px;
+            max-width: 460px; margin: 0 auto; width: 100%;
         }
-
         .app-card {
-            background: rgba(30, 41, 59, 0.6);
-            backdrop-filter: blur(10px);
-            border-radius: 18px;
-            padding: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-radius: 16px; padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 16px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; gap: 14px;
+            position: relative; overflow: hidden;
+        }
+        .app-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, var(--accent-bg, transparent) 0%, transparent 60%);
+            opacity: 0; transition: opacity 0.25s;
         }
         .app-card:active {
             transform: scale(0.97);
-            background: rgba(30, 41, 59, 0.9);
-        }
-        .app-card:hover {
             border-color: var(--accent, #007aff);
+            box-shadow: 0 0 20px var(--accent-bg, rgba(0, 122, 255, 0.2));
         }
-
+        .app-card:active::before { opacity: 1; }
         .app-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            flex-shrink: 0;
+            width: 52px; height: 52px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; flex-shrink: 0;
             background: var(--accent-bg, rgba(0, 122, 255, 0.15));
             border: 1px solid var(--accent-border, rgba(0, 122, 255, 0.3));
+            transition: transform 0.25s;
         }
-
-        .app-info { flex: 1; min-width: 0; }
+        .app-card:active .app-icon { transform: scale(1.1) rotate(-5deg); }
+        .app-info { flex: 1; min-width: 0; position: relative; z-index: 1; }
         .app-name {
-            font-size: 17px;
-            font-weight: 700;
-            color: #f1f5f9;
-            margin-bottom: 3px;
+            font-size: 16px; font-weight: 700; color: #f1f5f9; margin-bottom: 2px;
         }
-        .app-desc {
-            font-size: 12px;
-            color: #94a3b8;
-            line-height: 1.3;
+        .app-desc { font-size: 11px; color: #64748b; line-height: 1.3; }
+        .app-arrow {
+            color: #475569; font-size: 18px; flex-shrink: 0;
+            transition: transform 0.25s, color 0.25s;
         }
+        .app-card:active .app-arrow { transform: translateX(4px); color: var(--accent, #007aff); }
 
         .boot-footer {
-            text-align: center;
-            margin-top: auto;
-            padding-top: 30px;
-            font-size: 11px;
-            color: #475569;
+            text-align: center; margin-top: auto; padding-top: 25px;
+            font-size: 10px; color: #334155; font-weight: 600;
         }
 
-        /* === LOADING STATE === */
+        /* === LOADING === */
         #loading-screen {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
+            display: none; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 100vh; padding: 20px;
         }
-        #loading-screen.visible { display: flex; }
+        #loading-screen.visible { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .loader-spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top-color: #f97316;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            width: 44px; height: 44px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #f97316; border-right-color: #fbbf24;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .loader-text { font-size: 15px; color: #94a3b8; font-weight: 600; }
+        .loader-text { font-size: 14px; color: #64748b; font-weight: 600; }
 
-        /* === ERROR STATE === */
+        /* === ERROR === */
         #error-screen {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 30px;
-            text-align: center;
+            display: none; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 100vh; padding: 30px; text-align: center;
         }
-        #error-screen.visible { display: flex; }
-        .error-icon { font-size: 64px; margin-bottom: 20px; }
-        .error-title { font-size: 20px; font-weight: 700; color: #ef4444; margin-bottom: 8px; }
-        .error-msg { font-size: 13px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; max-width: 320px; }
+        #error-screen.visible { display: flex; animation: fadeIn 0.3s ease; }
+        .error-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.8; }
+        .error-title { font-size: 18px; font-weight: 700; color: #ef4444; margin-bottom: 8px; }
+        .error-msg { font-size: 12px; color: #64748b; margin-bottom: 24px; line-height: 1.5; max-width: 300px; }
         .retry-btn {
-            background: linear-gradient(90deg, #f97316, #fb923c);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
+            background: linear-gradient(135deg, #f97316, #fb923c);
+            color: white; border: none; padding: 12px 28px;
+            border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+            transition: transform 0.2s;
         }
+        .retry-btn:active { transform: scale(0.96); }
 
-        /* === APP IFRAME === */
+        /* === IFRAME === */
         #app-frame {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            border: none;
-            background: #f2f2f7;
+            display: none; position: fixed; inset: 0;
+            width: 100vw; height: 100vh; border: none; background: #f2f2f7;
         }
-        #app-frame.visible { display: block; }
+        #app-frame.visible { display: block; animation: slideUp 0.3s ease; }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
 
-        /* === FLOATING SWITCH BUTTON === */
+        /* === SMART SWITCH BUTTON === */
+        /* Full button — auto-hides after 3s, shows when dot is tapped */
         #switch-btn {
             position: fixed;
-            bottom: max(16px, env(safe-area-inset-bottom));
-            right: 16px;
-            z-index: 99999;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(12px);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 10px 14px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 12px;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: 16px; z-index: 99999;
+            background: rgba(10, 14, 26, 0.9);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            color: #f1f5f9; border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 16px; border-radius: 24px;
+            font-weight: 700; font-size: 12px; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            opacity: 0; transform: translateY(20px) scale(0.8);
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
-        #switch-btn.visible { display: flex; }
+        #switch-btn.visible {
+            opacity: 1; transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
         #switch-btn:active { transform: scale(0.95); }
 
-        /* === CONFIRM MODAL (for switching apps) === */
-        #confirm-modal {
-            display: none;
+        /* Small floating dot — always visible when app is loaded */
+        #switch-dot {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 100000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            backdrop-filter: blur(4px);
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: 20px; z-index: 99998;
+            width: 12px; height: 12px;
+            background: rgba(249, 115, 22, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%; cursor: pointer;
+            display: none;
+            box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+            animation: dotPulse 2s ease-in-out infinite;
+        }
+        #switch-dot.visible { display: block; }
+        @keyframes dotPulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(249, 115, 22, 0.3); transform: scale(1); }
+            50% { box-shadow: 0 0 16px rgba(249, 115, 22, 0.6); transform: scale(1.2); }
+        }
+        #switch-dot:active { transform: scale(1.5); }
+
+        /* === CONFIRM MODAL === */
+        #confirm-modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.6); z-index: 100000;
+            align-items: center; justify-content: center;
+            padding: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
         #confirm-modal.visible { display: flex; }
         .confirm-box {
             background: #1e293b;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 18px;
-            padding: 25px;
-            max-width: 360px;
-            width: 100%;
-            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px; padding: 28px;
+            max-width: 340px; width: 100%; text-align: center;
+            animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .confirm-icon { font-size: 40px; margin-bottom: 12px; }
-        .confirm-title { font-size: 18px; font-weight: 700; color: white; margin-bottom: 8px; }
-        .confirm-msg { font-size: 13px; color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.8) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .confirm-icon { font-size: 36px; margin-bottom: 10px; }
+        .confirm-title { font-size: 17px; font-weight: 700; color: white; margin-bottom: 8px; }
+        .confirm-msg { font-size: 12px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
         .confirm-actions { display: flex; gap: 10px; }
         .confirm-btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            font-weight: 700; font-size: 14px; cursor: pointer;
+            transition: transform 0.2s;
         }
-        .confirm-btn.cancel { background: rgba(255, 255, 255, 0.08); color: white; }
-        .confirm-btn.confirm { background: linear-gradient(90deg, #ef4444, #f87171); color: white; }
+        .confirm-btn:active { transform: scale(0.96); }
+        .confirm-btn.cancel { background: rgba(255, 255, 255, 0.06); color: #94a3b8; }
+        .confirm-btn.confirm {
+            background: linear-gradient(135deg, #ef4444, #f87171); color: white;
+            box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
+        }
     </style>
 </head>
 <body>
 
-    <!-- BOOT SCREEN (app picker) -->
+    <div id="bg-gradient"></div>
+    <div id="bg-glow"></div>
+
+    <!-- BOOT SCREEN -->
     <div id="boot-screen">
         <div class="boot-header">
             <div class="boot-logo">⚡</div>
             <div class="boot-title">KM Production Line</div>
             <div class="boot-subtitle">Select which app you want to use on this device. Your choice will be remembered next time.</div>
         </div>
-
         <div class="app-list">
-            <div class="app-card" onclick="selectApp('wiring')" style="--accent: #ff9500; --accent-bg: rgba(255, 149, 0, 0.15); --accent-border: rgba(255, 149, 0, 0.3);">
+            <div class="app-card" onclick="selectApp('wiring')" style="--accent: #ff9500; --accent-bg: rgba(255, 149, 0, 0.12); --accent-border: rgba(255, 149, 0, 0.25);">
                 <div class="app-icon">⚡</div>
                 <div class="app-info">
                     <div class="app-name">Wiring Scanner</div>
-                    <div class="app-desc">For wiring department workers — scan serial + select machine</div>
+                    <div class="app-desc">For wiring department — scan serial + select machine</div>
                 </div>
+                <div class="app-arrow">›</div>
             </div>
-
-            <div class="app-card" onclick="selectApp('assembly')" style="--accent: #5ac8fa; --accent-bg: rgba(90, 200, 250, 0.15); --accent-border: rgba(90, 200, 250, 0.3);">
+            <div class="app-card" onclick="selectApp('assembly')" style="--accent: #5ac8fa; --accent-bg: rgba(90, 200, 250, 0.12); --accent-border: rgba(90, 200, 250, 0.25);">
                 <div class="app-icon">⚙️</div>
                 <div class="app-info">
                     <div class="app-name">Assembly Scanner</div>
                     <div class="app-desc">For assembly department — scan serial, auto-detects machine</div>
                 </div>
+                <div class="app-arrow">›</div>
             </div>
-
-            <div class="app-card" onclick="selectApp('dispatch')" style="--accent: #5856d6; --accent-bg: rgba(88, 86, 214, 0.15); --accent-border: rgba(88, 86, 214, 0.3);">
+            <div class="app-card" onclick="selectApp('dispatch')" style="--accent: #5856d6; --accent-bg: rgba(88, 86, 214, 0.12); --accent-border: rgba(88, 86, 214, 0.25);">
                 <div class="app-icon">🚚</div>
                 <div class="app-info">
                     <div class="app-name">Dispatch Scanner</div>
                     <div class="app-desc">For dispatch department — scan serial + customer + invoice</div>
                 </div>
+                <div class="app-arrow">›</div>
             </div>
-
-            <div class="app-card" onclick="selectApp('data-entry')" style="--accent: #34c759; --accent-bg: rgba(52, 199, 89, 0.15); --accent-border: rgba(52, 199, 89, 0.3);">
+            <div class="app-card" onclick="selectApp('data-entry')" style="--accent: #34c759; --accent-bg: rgba(52, 199, 89, 0.12); --accent-border: rgba(52, 199, 89, 0.25);">
                 <div class="app-icon">📋</div>
                 <div class="app-info">
                     <div class="app-name">Frame and Machine Stock</div>
                     <div class="app-desc">Stock management + add new machines (admin)</div>
                 </div>
+                <div class="app-arrow">›</div>
             </div>
-
-            <div class="app-card" onclick="selectApp('dashboard')" style="--accent: #ff2d55; --accent-bg: rgba(255, 45, 85, 0.15); --accent-border: rgba(255, 45, 85, 0.3);">
+            <div class="app-card" onclick="selectApp('dashboard')" style="--accent: #ff2d55; --accent-bg: rgba(255, 45, 85, 0.12); --accent-border: rgba(255, 45, 85, 0.25);">
                 <div class="app-icon">📊</div>
                 <div class="app-info">
                     <div class="app-name">Dashboard</div>
                     <div class="app-desc">Live stock + production overview (read-only)</div>
                 </div>
+                <div class="app-arrow">›</div>
             </div>
         </div>
-
-        <div class="boot-footer">
-            v1.0 • Experimental Combined Launcher
-        </div>
+        <div class="boot-footer">v2.0 • KM Production Line</div>
     </div>
 
-    <!-- LOADING SCREEN -->
+    <!-- LOADING -->
     <div id="loading-screen">
         <div class="loader-spinner"></div>
         <div class="loader-text" id="loader-text">Loading app...</div>
     </div>
 
-    <!-- ERROR SCREEN -->
+    <!-- ERROR -->
     <div id="error-screen">
         <div class="error-icon">⚠️</div>
         <div class="error-title">Cannot Load App</div>
@@ -311,12 +327,15 @@
         <button class="retry-btn" onclick="retryLoad()">Try Again</button>
     </div>
 
-    <!-- APP IFRAME (the chosen app loads here) -->
+    <!-- IFRAME -->
     <iframe id="app-frame"></iframe>
 
-    <!-- FLOATING SWITCH BUTTON -->
+    <!-- FLOATING DOT (small, always visible when app loaded) -->
+    <div id="switch-dot" onclick="showSwitchButton()"></div>
+
+    <!-- SWITCH BUTTON (full, auto-hides after 3s) -->
     <button id="switch-btn" onclick="showConfirmSwitch()">
-        ↩ <span>Switch</span>
+        ↩ <span>Switch App</span>
     </button>
 
     <!-- CONFIRM MODAL -->
@@ -333,46 +352,27 @@
     </div>
 
     <script>
-        // === CONFIG: GitHub raw URLs for each app ===
-        // Using the GitHub repo we just uploaded so the apps are always available
         const APPS = {
-            'wiring': {
-                name: 'Wiring Scanner',
-                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/wiring-new.html'
-            },
-            'assembly': {
-                name: 'Assembly Scanner',
-                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/assembly-new.html'
-            },
-            'dispatch': {
-                name: 'Dispatch Scanner',
-                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dispatch-new.html'
-            },
-            'data-entry': {
-                name: 'Frame and Machine Stock',
-                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/data-entry-new.html'
-            },
-            'dashboard': {
-                name: 'Dashboard',
-                url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dashboard-new.html'
-            }
+            'wiring': { name: 'Wiring Scanner', url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/wiring-new.html' },
+            'assembly': { name: 'Assembly Scanner', url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/assembly-new.html' },
+            'dispatch': { name: 'Dispatch Scanner', url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dispatch-new.html' },
+            'data-entry': { name: 'Frame and Machine Stock', url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/data-entry-new.html' },
+            'dashboard': { name: 'Dashboard', url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/dashboard-new.html' }
         };
-
-        // localStorage keys
         const LS_SELECTED = 'pl_selected_app';
         const LS_HTML_CACHE_PREFIX = 'pl_app_html_';
-
-        // === STATE ===
         let currentApp = null;
         let isLoading = false;
+        let switchHideTimer = null;
 
-        // === HELPERS ===
         function showScreen(screenId) {
             ['boot-screen', 'loading-screen', 'error-screen'].forEach(id => {
                 document.getElementById(id).classList.toggle('visible', id === screenId);
             });
             document.getElementById('app-frame').classList.remove('visible');
             document.getElementById('switch-btn').classList.remove('visible');
+            document.getElementById('switch-dot').classList.remove('visible');
+            clearTimeout(switchHideTimer);
         }
 
         function showApp() {
@@ -380,50 +380,39 @@
                 document.getElementById(id).classList.remove('visible');
             });
             document.getElementById('app-frame').classList.add('visible');
-            document.getElementById('switch-btn').classList.add('visible');
+            // Show switch button briefly, then auto-hide to dot
+            showSwitchButton();
         }
 
-        // === APP SELECTION ===
+        // Show full switch button, auto-hide after 3s → show dot
+        function showSwitchButton() {
+            document.getElementById('switch-btn').classList.add('visible');
+            document.getElementById('switch-dot').classList.remove('visible');
+            clearTimeout(switchHideTimer);
+            switchHideTimer = setTimeout(() => {
+                document.getElementById('switch-btn').classList.remove('visible');
+                document.getElementById('switch-dot').classList.add('visible');
+            }, 3000);
+        }
+
         async function selectApp(appName) {
             if (isLoading) return;
             isLoading = true;
             currentApp = appName;
-
             const app = APPS[appName];
-            if (!app) {
-                isLoading = false;
-                return;
-            }
-
-            // Show loading
+            if (!app) { isLoading = false; return; }
             document.getElementById('loader-text').textContent = 'Loading ' + app.name + '...';
             showScreen('loading-screen');
-
-            // Try to fetch the app's HTML
             try {
                 const response = await fetch(app.url, { cache: 'no-cache' });
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
                 const html = await response.text();
-
-                // Cache the HTML for offline use next time
-                try {
-                    localStorage.setItem(LS_HTML_CACHE_PREFIX + appName, html);
-                } catch (e) {
-                    console.warn('Could not cache HTML (might be too large):', e);
-                }
-
-                // Save the selection
+                try { localStorage.setItem(LS_HTML_CACHE_PREFIX + appName, html); } catch (e) {}
                 localStorage.setItem(LS_SELECTED, appName);
-
-                // Load the app in the iframe
                 loadAppInIframe(html);
                 isLoading = false;
             } catch (e) {
-                console.error('Failed to load app:', e);
-                document.getElementById('error-msg').textContent = 
-                    'Could not load ' + app.name + '. Please check your internet connection and try again.';
+                document.getElementById('error-msg').textContent = 'Could not load ' + app.name + '. Check internet and try again.';
                 showScreen('error-screen');
                 isLoading = false;
             }
@@ -436,63 +425,47 @@
         }
 
         function retryLoad() {
-            if (currentApp) {
-                selectApp(currentApp);
-            } else {
-                showScreen('boot-screen');
-            }
+            if (currentApp) selectApp(currentApp);
+            else showScreen('boot-screen');
         }
 
-        // === SWITCH APP ===
         function showConfirmSwitch() {
+            clearTimeout(switchHideTimer);
+            document.getElementById('switch-btn').classList.remove('visible');
+            document.getElementById('switch-dot').classList.remove('visible');
             document.getElementById('confirm-modal').classList.add('visible');
         }
 
         function hideConfirmSwitch() {
             document.getElementById('confirm-modal').classList.remove('visible');
+            showSwitchButton();
         }
 
         function confirmSwitch() {
             hideConfirmSwitch();
-            // Clear the selection
             localStorage.removeItem(LS_SELECTED);
-            // Optionally clear the cached HTML too
-            if (currentApp) {
-                localStorage.removeItem(LS_HTML_CACHE_PREFIX + currentApp);
-            }
+            if (currentApp) localStorage.removeItem(LS_HTML_CACHE_PREFIX + currentApp);
             currentApp = null;
-            // Clear the iframe
             document.getElementById('app-frame').srcdoc = '';
-            // Show boot screen
             showScreen('boot-screen');
         }
 
-        // === INIT (runs on page load) ===
+        // INIT
         (function init() {
             const selectedApp = localStorage.getItem(LS_SELECTED);
-
             if (selectedApp && APPS[selectedApp]) {
-                // User already selected an app — try to load from cache first
                 const cachedHtml = localStorage.getItem(LS_HTML_CACHE_PREFIX + selectedApp);
                 if (cachedHtml) {
-                    // Load from cache (instant, no network needed)
                     currentApp = selectedApp;
                     loadAppInIframe(cachedHtml);
-                    // Also fetch fresh in background to update cache (silent)
                     fetch(APPS[selectedApp].url, { cache: 'no-cache' })
                         .then(r => r.text())
-                        .then(html => {
-                            try {
-                                localStorage.setItem(LS_HTML_CACHE_PREFIX + selectedApp, html);
-                            } catch (e) {}
-                        })
+                        .then(html => { try { localStorage.setItem(LS_HTML_CACHE_PREFIX + selectedApp, html); } catch (e) {} })
                         .catch(() => {});
                 } else {
-                    // No cache, fetch fresh
                     selectApp(selectedApp);
                 }
             } else {
-                // No selection — show boot screen
                 showScreen('boot-screen');
             }
         })();

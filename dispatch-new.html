@@ -254,7 +254,7 @@ function isKnownSerial(serial) {
             const btn = document.getElementById('sync-btn');
             btn.innerText = "...";
             try {
-                const res = await fetch(CSV_URL); const text = await res.text(); parseDispatch(text);
+                const res = await fetch(CSV_URL + '&t=' + Date.now()); const text = await res.text(); parseDispatch(text);
                 localStorage.setItem(LS_TIME, new Date().toLocaleTimeString());
                 document.getElementById('sync-time').innerText = localStorage.getItem(LS_TIME);
                 updateGoal(); renderHistory(); updatePendingUI(); handleSerialInput(); 

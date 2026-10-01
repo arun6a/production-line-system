@@ -135,6 +135,52 @@
         const CORE_URL = "https://script.google.com/macros/s/AKfycbxhC68ObyS_Z3swzMh0NjWgd9Qs2W3pOGu2HKjQRA5LIfXH_LHx_mEDyYFnCo-OxwNe/exec";
         const SCRIPT_URL = CORE_URL + "?action=logDispatch";  // dispatch scan endpoint
         const MACHINES_URL = CORE_URL + "?action=readMachines";  // machine list endpoint (for future use)
+
+        // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
+        let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
+
+        function isKnownSerial(serial) {
+            if (!serial) return false;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return true;
+            }
+            return false;
+        }
+
+        function getMaterialTypeFromSerial(serial) {
+            if (!serial) return null;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return PREFIX_MAP[prefix];
+            }
+            return null;
+        }
+
+        async function fetchPrefixMap(url) {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.prefixMap) {
+                    PREFIX_MAP = data.prefixMap;
+                    console.log('Loaded prefix map:', PREFIX_MAP);
+                } else if (data.machines) {
+                    PREFIX_MAP = {};
+                    data.machines.forEach(m => {
+                        if (m.status === 'active' && m.serial_prefix) {
+                            PREFIX_MAP[m.serial_prefix.toUpperCase()] = m.material_type.toUpperCase();
+                        }
+                    });
+                    if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
+                    if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
+                    console.log('Built prefix map from machines:', PREFIX_MAP);
+                }
+            } catch (err) {
+                console.warn('Prefix map fetch failed, using default:', err);
+            }
+        }
         
         // CSV URL for fetching dispatch history (used for duplicate detection + recent history display)
         const CSV_URL = `https://docs.google.com/spreadsheets/d/15Kj3Dw073HjuK54uYOEq4kn-04SeSOUqHydgZetDphI/export?format=csv&gid=200741550`;
@@ -144,7 +190,7 @@
         const LS_HIST = 'dispatch_history'; const LS_TIME = 'dispatch_sync_time';
         let pendingQueue = JSON.parse(localStorage.getItem('dispatch_pending') || "[]");
 
-        document.addEventListener("DOMContentLoaded", () => { initDate(); runSync(); });
+        document.addEventListener("DOMContentLoaded", () => { initDate(); fetchPrefixMap(MACHINES_URL); runSync(); });
         function initDate() { document.getElementById('field-date').value = new Date().toISOString().split('T')[0]; }
         function toggleHistory() { document.getElementById('history-modal').classList.toggle('open'); }
 
@@ -210,7 +256,7 @@
                 const customer = (cells[2] || "Unknown").trim();
                 const dateStr = (cells[3] || "").trim();
                 const dateObj = parseDate(dateStr);
-                if (serial.startsWith("KM") || serial.startsWith("SSKM")) {
+                if (isKnownSerial(serial)) {
                     if (dateObj >= cutoff) { history.push({ serial, customer, invoice, date: dateStr, status: 'synced' }); }
                 }
             }
@@ -223,7 +269,7 @@
             html5QrCode.start({ facingMode: "environment" }, config, 
                 (text) => {
                     const up = text.trim().toUpperCase();
-                    if (up.startsWith("KM") || up.startsWith("SSKM")) {
+                    if (isKnownSerial(up)) {
                         // Machine serial number
                         document.getElementById('field-serial').value = up;
                     } else if (up.match(/^D\d{3,}$/) || text.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) {

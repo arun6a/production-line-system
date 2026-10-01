@@ -967,7 +967,7 @@ function isKnownSerial(serial) {
             const data = rows.map((row, idx) => {
                 const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
                 let fDate = null, fSerial = null, fInvoice = "N/A", names = [];
-                cells.forEach(val => { const up = val.toUpperCase(); if (looksLikeSerial(up)) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
+                cells.forEach(val => { const up = val.toUpperCase(); if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (looksLikeSerial(up)) fSerial = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
                 if(!fSerial) return null;
                 let fCust = names.filter(n => n.includes(" ")).reduce((a,b) => a.length > b.length ? a : b, names[0] || "Unknown Customer");
                 if(fCust !== "Unknown Customer") customerFrequency[fCust] = (customerFrequency[fCust] || 0) + 1;

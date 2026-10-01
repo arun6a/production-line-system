@@ -380,7 +380,17 @@
   // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
   let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
 
-  function isKnownSerial(serial) {
+  
+        // Accepts ANY serial that looks like one (not just known prefixes)
+        function looksLikeSerial(text) {
+            if (!text) return false;
+            const up = text.toString().trim().toUpperCase();
+            if (up.startsWith('HTTP') || up.length < 5) return false;
+            // Must be alphanumeric, contain at least one letter and one digit
+            return /^[A-Z0-9]+$/.test(up) && /[A-Z]/.test(up) && /\d/.test(up);
+        }
+
+function isKnownSerial(serial) {
       if (!serial) return false;
       const upper = serial.toString().toUpperCase();
       const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
@@ -1393,7 +1403,7 @@
       const dateStr=cells[0]||'';
       for (const [idx, name] of Object.entries(machineCols)) {
         const s=cells[idx]?cells[idx].trim().toUpperCase():'';
-        if(isKnownSerial(s)) history.push({serial:s,type:name,date:dateStr,status:'synced'});
+        if(looksLikeSerial(s)) history.push({serial:s,type:name,date:dateStr,status:'synced'});
       }
     }
     localStorage.setItem(WR_LS_HIST, JSON.stringify(history));
@@ -1523,7 +1533,7 @@
   function wrStartScanner() {
     wrHtml5QrCode = new Html5Qrcode('wr-reader');
     wrHtml5QrCode.start({facingMode:'environment'},{fps:25,qrbox:(vw,vh)=>({width:Math.floor(vw*0.9),height:Math.floor(vh*0.85)})},
-      text=>{ const up=text.trim().toUpperCase(); if(isKnownSerial(up)){document.getElementById('wr-serial').value=up;wrHandleSerial();if(navigator.vibrate)navigator.vibrate(50);} }
+      text=>{ const up=text.trim().toUpperCase(); if(looksLikeSerial(up)){document.getElementById('wr-serial').value=up;wrHandleSerial();if(navigator.vibrate)navigator.vibrate(50);} }
     ).catch(e=>console.log('Camera error',e));
   }
 

@@ -915,7 +915,7 @@ function isKnownSerial(serial) {
             if(!silent) showLoading(true);
             colorIndex = 0; machineColorMap = {};
             try {
-                const [dRes, wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.dispatch), fetch(CONFIG.wiring), fetch(CONFIG.assembly), fetch(CONFIG.stock) ]);
+                const [dRes, wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.dispatch + '&t=' + Date.now()), fetch(CONFIG.wiring + '&t=' + Date.now()), fetch(CONFIG.assembly + '&t=' + Date.now()), fetch(CONFIG.stock + '&t=' + Date.now()) ]);
                 const dText = await dRes.text(); const wText = await wRes.text(); const aText = await aRes.text(); const sText = await sRes.text();
                 DB.wiring = parseProductionSheet(wText, 'wiring');
                 DB.assembly = parseProductionSheet(aText, 'assembly');

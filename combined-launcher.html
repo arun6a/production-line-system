@@ -96,6 +96,9 @@
         .app-card:active .app-arrow { transform: translateX(4px); color: var(--accent, #007aff); }
 
         .boot-footer { text-align: center; margin-top: auto; padding-top: 20px; font-size: 10px; color: #c0c0c5; font-weight: 600; }
+        .boot-info-box { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 16px; padding: 16px 20px; margin: 20px auto 0; max-width: 380px; text-align: center; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+        .boot-info-title { font-size: 15px; font-weight: 800; color: #1a1a1a; margin-bottom: 6px; }
+        .boot-info-subtitle { font-size: 12px; color: #1a1a1a; font-weight: 700; line-height: 1.5; }
 
         /* === LOADING === */
         #loading-screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; position: relative; z-index: 1; }
@@ -152,8 +155,6 @@
     <div id="boot-screen">
         <div class="boot-header">
             <img src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" class="boot-logo" alt="Logo">
-            <div class="boot-title">KM Production Line</div>
-            <div class="boot-subtitle">Select which app you want to use on this device. Your choice will be remembered next time.</div>
         </div>
         <div class="app-list">
             <div class="app-card" onclick="selectApp('wiring')" style="--accent:#ff9500;--accent-bg:rgba(255,149,0,0.1);--accent-border:rgba(255,149,0,0.2);">
@@ -181,6 +182,10 @@
                 <div class="app-info"><div class="app-name">Dashboard</div><div class="app-desc">Live stock + production overview (read-only)</div></div>
                 <div class="app-arrow">›</div>
             </div>
+        </div>
+        <div class="boot-info-box">
+            <div class="boot-info-title">KM Production Line</div>
+            <div class="boot-info-subtitle">Select which app you want to use on this device. Your choice will be remembered next time.</div>
         </div>
         <div class="boot-footer">v2.0 • KM Production Line</div>
     </div>

@@ -679,7 +679,8 @@ function isKnownSerial(serial) {
                 cells.forEach((val, idx) => {
                     if (ignoreIndices.has(idx)) return; const serial = val.trim().toUpperCase(); if (!serial) return;
                     let machineType = getMaterialTypeFromSerial(serial);
-                    if (machineType) {
+                    if (machineType || looksLikeSerial(serial)) {
+                        if (!machineType) machineType = 'MS'; // fallback until PREFIX_MAP loads
                         const machineName = rawHeaders[idx] || 'Unknown'; const displayName = `${machineType} ${machineName}`;
                         SERIAL_MAP[serial] = displayName;
                         results.push({ serial: serial, customer: displayName, dateObj: dateObj });

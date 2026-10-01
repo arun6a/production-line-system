@@ -1377,7 +1377,7 @@ function isKnownSerial(serial) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(WIRING_CSV_URL, { signal: controller.signal });
+      const res = await fetch(WIRING_CSV_URL + '&t=' + Date.now(), { signal: controller.signal });
       clearTimeout(timer);
       const text = await res.text();
       wrParseWiring(text);

@@ -38,10 +38,10 @@
         .camera-container {
             background: #000; border-radius: 16px; overflow: hidden;
             margin-bottom: 20px; position: relative;
-            aspect-ratio: 3/4;
+            min-height: 400px;
         }
-        #reader { width: 100%; height: 100%; }
-        #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        #reader { width: 100%; height: 100%; min-height: 400px; }
+        #reader video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
         .camera-overlay {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             pointer-events: none; display: flex; align-items: center; justify-content: center;
@@ -340,6 +340,11 @@
             <textarea class="form-textarea" id="form-notes" placeholder="Any notes about this packing"></textarea>
         </div>
 
+        <div class="form-section">
+            <button onclick="toggleRawOcrText()" style="background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; width: 100%; color: var(--blue);">📄 Show raw OCR text (for manual copy-paste)</button>
+            <div id="raw-ocr-text" style="display: none; margin-top: 12px; padding: 12px; background: #f5f5f5; border-radius: 10px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border: 1px solid var(--border);"></div>
+        </div>
+
         <button class="btn-submit" id="btn-submit" onclick="submitPacking()">Submit Packing</button>
     </div>
 
@@ -456,7 +461,11 @@
                 const config = {
                     fps: 10,
                     qrbox: (vw, vh) => ({ width: vw * 0.7, height: vh * 0.3 }),
-                    aspectRatio: 3/4
+                    videoConstraints: {
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
                 };
 
                 await html5QrCode.start(
@@ -625,10 +634,12 @@
                     }
                 });
                 document.getElementById('progress-fill').style.width = '70%';
-                document.getElementById('ocr-detail').textContent = 'Tesseract: ' + (result.data.text.length) + ' chars';
-                return result.data.text;
+                rawTesseractText = result.data.text || '';
+                document.getElementById('ocr-detail').textContent = 'Tesseract: ' + rawTesseractText.length + ' chars';
+                return rawTesseractText;
             } catch (e) {
                 document.getElementById('ocr-detail').textContent = 'Tesseract failed: ' + e.message;
+                rawTesseractText = '';
                 return '';
             }
         }
@@ -636,9 +647,15 @@
         async function runOcrSpaceApi(blob) {
             try {
                 document.getElementById('processing-status').textContent = 'Running OCR.space API (Method 2)...';
+                // Get API key from localStorage if not hardcoded
+                const apiKey = OCR_SPACE_API_KEY || localStorage.getItem('ocr_space_api_key') || '';
+                if (!apiKey) {
+                    document.getElementById('ocr-detail').textContent += ' | OCR.space skipped (no API key)';
+                    return '';
+                }
                 const formData = new FormData();
                 formData.append('file', blob, 'photo.jpg');
-                formData.append('apikey', OCR_SPACE_API_KEY);
+                formData.append('apikey', apiKey);
                 formData.append('language', 'eng');
                 formData.append('scale', 'true');
 
@@ -651,12 +668,15 @@
 
                 if (data.ParsedResults && data.ParsedResults.length > 0) {
                     const text = data.ParsedResults[0].ParsedText;
-                    document.getElementById('ocr-detail').textContent += ' | OCR.space: ' + text.length + ' chars';
-                    return text;
+                    rawOcrSpaceText = text || '';
+                    document.getElementById('ocr-detail').textContent += ' | OCR.space: ' + rawOcrSpaceText.length + ' chars';
+                    return rawOcrSpaceText;
                 }
+                rawOcrSpaceText = '';
                 return '';
             } catch (e) {
                 document.getElementById('ocr-detail').textContent += ' | OCR.space failed: ' + e.message;
+                rawOcrSpaceText = '';
                 return '';
             }
         }
@@ -1188,6 +1208,21 @@
             toast.className = 'toast ' + type;
             setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Store raw OCR text for manual review
+        let rawTesseractText = '';
+        let rawOcrSpaceText = '';
+
+        function toggleRawOcrText() {
+            const el = document.getElementById('raw-ocr-text');
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                const content = '=== TESSERACT.JS OUTPUT ===\n' + rawTesseractText + '\n\n=== OCR.SPACE OUTPUT ===\n' + (rawOcrSpaceText || '(not run - no API key set)');
+                el.textContent = content;
+            } else {
+                el.style.display = 'none';
+            }
         }
 
         // ==================== INIT ====================

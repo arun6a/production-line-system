@@ -377,6 +377,52 @@
   const FALLBACK_MODELS = ['CIDM', 'CSEM', 'CSIM', 'CCBM', 'CIDM110'];
   let ACTIVE_MODELS = [...FALLBACK_MODELS];
 
+  // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
+  let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
+
+  function isKnownSerial(serial) {
+      if (!serial) return false;
+      const upper = serial.toString().toUpperCase();
+      const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+      for (const prefix of prefixes) {
+          if (upper.startsWith(prefix)) return true;
+      }
+      return false;
+  }
+
+  function getMaterialTypeFromSerial(serial) {
+      if (!serial) return null;
+      const upper = serial.toString().toUpperCase();
+      const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+      for (const prefix of prefixes) {
+          if (upper.startsWith(prefix)) return PREFIX_MAP[prefix];
+      }
+      return null;
+  }
+
+  async function fetchPrefixMap(url) {
+      try {
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.prefixMap) {
+              PREFIX_MAP = data.prefixMap;
+              console.log('Loaded prefix map:', PREFIX_MAP);
+          } else if (data.machines) {
+              PREFIX_MAP = {};
+              data.machines.forEach(m => {
+                  if (m.status === 'active' && m.serial_prefix) {
+                      PREFIX_MAP[m.serial_prefix.toUpperCase()] = m.material_type.toUpperCase();
+                  }
+              });
+              if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
+              if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
+              console.log('Built prefix map from machines:', PREFIX_MAP);
+          }
+      } catch (err) {
+          console.warn('Prefix map fetch failed, using default:', err);
+      }
+  }
+
   // ── WIRING STATE (isolated) ───────────────────────────────────────────────
   let wrPendingQueue = JSON.parse(localStorage.getItem('wiring_pending') || '[]');
   let wrSelectedMachine = '';
@@ -417,6 +463,7 @@
     // Load data in background
     svcLoad();
     wrFetchMachines();  // NEW — fetch machine list from registry
+    fetchPrefixMap(MACHINES_URL);  // NEW — fetch dynamic prefix map
     wrRunSync();
     svcStartPolling();
 
@@ -1346,7 +1393,7 @@
       const dateStr=cells[0]||'';
       for (const [idx, name] of Object.entries(machineCols)) {
         const s=cells[idx]?cells[idx].trim().toUpperCase():'';
-        if(s.startsWith('KM')||s.startsWith('SSKM')) history.push({serial:s,type:name,date:dateStr,status:'synced'});
+        if(isKnownSerial(s)) history.push({serial:s,type:name,date:dateStr,status:'synced'});
       }
     }
     localStorage.setItem(WR_LS_HIST, JSON.stringify(history));
@@ -1427,7 +1474,7 @@
     if(!target) return;
     const list=JSON.parse(localStorage.getItem(WR_LS_HIST)||'[]').slice(-50).reverse();
     target.innerHTML=list.map(i=>{
-      const prefix=i.serial.startsWith('SSKM')?'SS':'MS';
+      const prefix=getMaterialTypeFromSerial(i.serial) || 'MS';
       return `<div class="wr-hist-item"><span style="font-weight:600;"><span class="wr-hist-dot" style="background:${i.status==='pending'?'#f97316':'#22c55e'}"></span>${prefix} ${i.type} — ${i.serial.substring(0,12)}</span><span style="color:#8e8e93">${i.date}</span></div>`;
     }).join('');
   }
@@ -1476,7 +1523,7 @@
   function wrStartScanner() {
     wrHtml5QrCode = new Html5Qrcode('wr-reader');
     wrHtml5QrCode.start({facingMode:'environment'},{fps:25,qrbox:(vw,vh)=>({width:Math.floor(vw*0.9),height:Math.floor(vh*0.85)})},
-      text=>{ const up=text.trim().toUpperCase(); if(up.startsWith('KM')||up.startsWith('SSKM')){document.getElementById('wr-serial').value=up;wrHandleSerial();if(navigator.vibrate)navigator.vibrate(50);} }
+      text=>{ const up=text.trim().toUpperCase(); if(isKnownSerial(up)){document.getElementById('wr-serial').value=up;wrHandleSerial();if(navigator.vibrate)navigator.vibrate(50);} }
     ).catch(e=>console.log('Camera error',e));
   }
 

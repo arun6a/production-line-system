@@ -1360,7 +1360,7 @@
       if (el) el.textContent = now;
       const elh = document.getElementById('wr-sync-time-h');
       if (elh) elh.textContent = now;
-      showToast('✅ Wiring data synced');
+      // Sync toast removed — sync time is already shown in the UI, no need to interrupt the worker
     } catch(e) { showToast('⚠️ Sync failed'); }
     if (btn) btn.textContent = '🔄';
     wrUpdateGoal(); wrRenderHistory(); wrAutoPush();
@@ -1440,7 +1440,7 @@
       if(idx!==-1) history[idx].status='synced';
       localStorage.setItem(WR_LS_HIST,JSON.stringify(history));
       wrUpdatePendingUI(); wrRenderHistory(); wrUpdateGoal();
-      showToast('📡 Offline record synced!');
+      // showToast('📡 Offline record synced!'); // removed — doesn't interrupt worker during scanning
       if(wrPendingQueue.length>0) wrAutoPush();
     } catch(e) {}
   }

@@ -253,10 +253,6 @@ function isKnownSerial(serial) {
                     console.log('Re-rendered after PREFIX_MAP loaded');
                 }
             } catch(e) { console.warn('Re-render failed:', e); }
-        } catch(e) { console.warn('Re-render after prefix map failed:', e); }
-
-            console.warn('Prefix map fetch failed, using default:', err);
-            }
         }
 
         let html5QrCode;

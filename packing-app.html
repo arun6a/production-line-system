@@ -437,6 +437,7 @@
         let qrDetected = false;
         let editingRowId = null; // set when editing existing packing
         let courierSuggestionsLoaded = false;
+        let formItems = []; // items being reviewed in the form
 
         // ==================== SCREEN SWITCHING ====================
         function switchScreen(screenName, title, subtitle) {
@@ -905,13 +906,16 @@
             editingRowId = null;
         }
 
+        // ==================== ITEMS RENDERING ====================
         function renderItems(items) {
+            formItems = items || [];
             const container = document.getElementById('items-list');
-            if (items.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--sub); font-size:13px;">No items parsed. Tap "+ Add Item" to add manually.</div>';
+            if (!container) return;
+            if (formItems.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--sub); font-size:13px;">No items parsed. Tap \"+ Add Item\" to add manually.</div>';
                 return;
             }
-            container.innerHTML = items.map((item, idx) => `
+            container.innerHTML = formItems.map((item, idx) => `
                 <div class="item-card">
                     <div class="item-checkbox ${item.confirmed ? 'checked' : ''}" onclick="toggleItem(${idx})"></div>
                     <div class="item-info">
@@ -923,15 +927,15 @@
             `).join('');
         }
 
-        let formItems = [];
-
         function toggleItem(idx) {
-            formItems[idx].confirmed = !formItems[idx].confirmed;
-            renderItems(formItems);
+            if (formItems[idx]) {
+                formItems[idx].confirmed = !formItems[idx].confirmed;
+                renderItems(formItems);
+            }
         }
 
         function updateItemName(idx, newName) {
-            formItems[idx].name = newName;
+            if (formItems[idx]) formItems[idx].name = newName;
         }
 
         function deleteItem(idx) {
@@ -946,27 +950,6 @@
                 renderItems(formItems);
             }
         }
-
-        // Override renderItems to use formItems
-        const originalRenderItems = renderItems;
-        renderItems = function(items) {
-            formItems = items || [];
-            const container = document.getElementById('items-list');
-            if (formItems.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--sub); font-size:13px;">No items parsed. Tap "+ Add Item" to add manually.</div>';
-                return;
-            }
-            container.innerHTML = formItems.map((item, idx) => `
-                <div class="item-card">
-                    <div class="item-checkbox ${item.confirmed ? 'checked' : ''}" onclick="toggleItem(${idx})"></div>
-                    <div class="item-info">
-                        <div class="item-name" contenteditable="true" oninput="updateItemName(${idx}, this.textContent)">${item.name}</div>
-                        <div class="item-qty">Qty: ${item.qty}</div>
-                    </div>
-                    <button class="item-delete" onclick="deleteItem(${idx})">×</button>
-                </div>
-            `).join('');
-        };
 
         // ==================== SUBMIT ====================
         async function submitPacking() {
@@ -1252,16 +1235,6 @@
         }
 
         // ==================== INIT ====================
-        // Set OCR_SPACE_API_KEY from localStorage if available
-        const savedOcrKey = localStorage.getItem('ocr_space_api_key');
-        if (savedOcrKey) {
-            // Note: const can't be reassigned, so we use a different approach
-            // We'll check localStorage directly in the OCR function
-        }
-
-        // Override the OCR_SPACE_API_KEY check to also look at localStorage
-        const originalRunOcr = runOcr;
-
         // Initialize
         console.log('Packing Verification app loaded');
         console.log('Script URL:', SCRIPT_URL);

@@ -290,6 +290,16 @@
             <span id="form-confidence-text" style="font-size: 12px; margin-left: 8px;"></span>
         </div>
 
+        <!-- OCR DEBUG PANEL — always visible, helps diagnose OCR issues -->
+        <div style="margin-bottom: 16px; padding: 12px; background: #f5f5f5; border: 1px solid var(--border); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong style="font-size: 12px;">OCR Debug</strong>
+                <button onclick="toggleRawOcrText()" style="background: var(--bg); border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; color: var(--blue);">👁 Show/Hide raw text</button>
+            </div>
+            <div id="ocr-debug-info" style="font-size: 11px; color: var(--sub); font-family: monospace;">Waiting for OCR...</div>
+            <div id="raw-ocr-text" style="display: none; margin-top: 12px; padding: 12px; background: white; border-radius: 8px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border: 1px solid var(--border);"></div>
+        </div>
+
         <div class="form-section">
             <label class="form-label">Invoice Number *</label>
             <input type="text" class="form-input" id="form-invoice" placeholder="e.g., DC-00128">
@@ -338,11 +348,6 @@
         <div class="form-section">
             <label class="form-label">Notes (optional)</label>
             <textarea class="form-textarea" id="form-notes" placeholder="Any notes about this packing"></textarea>
-        </div>
-
-        <div class="form-section">
-            <button onclick="toggleRawOcrText()" style="background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; width: 100%; color: var(--blue);">📄 Show raw OCR text (for manual copy-paste)</button>
-            <div id="raw-ocr-text" style="display: none; margin-top: 12px; padding: 12px; background: #f5f5f5; border-radius: 10px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border: 1px solid var(--border);"></div>
         </div>
 
         <button class="btn-submit" id="btn-submit" onclick="submitPacking()">Submit Packing</button>
@@ -624,22 +629,27 @@
             try {
                 document.getElementById('processing-status').textContent = 'Running Tesseract.js OCR (Method 1)...';
                 document.getElementById('progress-fill').style.width = '30%';
+                updateOcrDebug('Tesseract.js: starting...', '');
 
                 const result = await Tesseract.recognize(blob, 'eng', {
                     logger: m => {
                         if (m.status === 'recognizing text') {
                             const pct = 30 + Math.round(m.progress * 40);
                             document.getElementById('progress-fill').style.width = pct + '%';
+                            updateOcrDebug('Tesseract.js: ' + Math.round(m.progress * 100) + '% done', rawTesseractText);
                         }
                     }
                 });
                 document.getElementById('progress-fill').style.width = '70%';
                 rawTesseractText = result.data.text || '';
-                document.getElementById('ocr-detail').textContent = 'Tesseract: ' + rawTesseractText.length + ' chars';
+                const charCount = rawTesseractText.length;
+                document.getElementById('ocr-detail').textContent = 'Tesseract: ' + charCount + ' chars';
+                updateOcrDebug('Tesseract.js: ✓ ' + charCount + ' chars extracted', rawTesseractText);
                 return rawTesseractText;
             } catch (e) {
                 document.getElementById('ocr-detail').textContent = 'Tesseract failed: ' + e.message;
                 rawTesseractText = '';
+                updateOcrDebug('Tesseract.js: ✗ FAILED - ' + e.message, '');
                 return '';
             }
         }
@@ -651,8 +661,10 @@
                 const apiKey = OCR_SPACE_API_KEY || localStorage.getItem('ocr_space_api_key') || '';
                 if (!apiKey) {
                     document.getElementById('ocr-detail').textContent += ' | OCR.space skipped (no API key)';
+                    updateOcrDebug('OCR.space: skipped (no API key set, go to Settings to add one)', rawTesseractText);
                     return '';
                 }
+                updateOcrDebug('OCR.space: sending photo to API...', rawTesseractText);
                 const formData = new FormData();
                 formData.append('file', blob, 'photo.jpg');
                 formData.append('apikey', apiKey);
@@ -670,13 +682,16 @@
                     const text = data.ParsedResults[0].ParsedText;
                     rawOcrSpaceText = text || '';
                     document.getElementById('ocr-detail').textContent += ' | OCR.space: ' + rawOcrSpaceText.length + ' chars';
+                    updateOcrDebug('OCR.space: ✓ ' + rawOcrSpaceText.length + ' chars extracted', rawTesseractText, rawOcrSpaceText);
                     return rawOcrSpaceText;
                 }
                 rawOcrSpaceText = '';
+                updateOcrDebug('OCR.space: ✗ No text in response - ' + (data.ErrorMessage || JSON.stringify(data).slice(0, 200)), rawTesseractText);
                 return '';
             } catch (e) {
                 document.getElementById('ocr-detail').textContent += ' | OCR.space failed: ' + e.message;
                 rawOcrSpaceText = '';
+                updateOcrDebug('OCR.space: ✗ FAILED - ' + e.message, rawTesseractText);
                 return '';
             }
         }
@@ -1218,10 +1233,21 @@
             const el = document.getElementById('raw-ocr-text');
             if (el.style.display === 'none') {
                 el.style.display = 'block';
-                const content = '=== TESSERACT.JS OUTPUT ===\n' + rawTesseractText + '\n\n=== OCR.SPACE OUTPUT ===\n' + (rawOcrSpaceText || '(not run - no API key set)');
-                el.textContent = content;
             } else {
                 el.style.display = 'none';
+            }
+        }
+
+        function updateOcrDebug(status, tesseractText, ocrSpaceText) {
+            const info = document.getElementById('ocr-debug-info');
+            if (info) info.textContent = status;
+            const raw = document.getElementById('raw-ocr-text');
+            if (raw) {
+                let content = '=== TESSERACT.JS OUTPUT ===\n';
+                content += tesseractText || '(empty)';
+                content += '\n\n=== OCR.SPACE OUTPUT ===\n';
+                content += ocrSpaceText !== undefined ? (ocrSpaceText || '(empty)') : '(not run yet)';
+                raw.textContent = content;
             }
         }
 

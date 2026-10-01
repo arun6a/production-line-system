@@ -437,7 +437,7 @@ function isKnownSerial(serial) {
             try {
                 // === FETCH MACHINES FIRST ===
                 await fetchMachines();
-    fetchPrefixMap(CONFIG.machinesUrl);  // NEW — fetch dynamic prefix map
+    await fetchPrefixMap(CONFIG.machinesUrl);  // CRITICAL: load prefix map BEFORE parsing
                 
                 const [wRes, aRes, sRes] = await Promise.all([ fetch(CONFIG.wiring + '&t=' + Date.now()), fetch(CONFIG.assembly + '&t=' + Date.now()), fetch(CONFIG.stock + '&t=' + Date.now()) ]);
                 DB.wiring = parseProductionSheet(await wRes.text());

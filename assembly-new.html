@@ -176,6 +176,52 @@
         const FALLBACK_MODELS = ['CIDM', 'CSEM', 'CSIM', 'CCBM', 'CIDM110'];
         let ACTIVE_MODELS = [...FALLBACK_MODELS];
 
+        // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
+        let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
+
+        function isKnownSerial(serial) {
+            if (!serial) return false;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return true;
+            }
+            return false;
+        }
+
+        function getMaterialTypeFromSerial(serial) {
+            if (!serial) return null;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return PREFIX_MAP[prefix];
+            }
+            return null;
+        }
+
+        async function fetchPrefixMap(url) {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.prefixMap) {
+                    PREFIX_MAP = data.prefixMap;
+                    console.log('Loaded prefix map:', PREFIX_MAP);
+                } else if (data.machines) {
+                    PREFIX_MAP = {};
+                    data.machines.forEach(m => {
+                        if (m.status === 'active' && m.serial_prefix) {
+                            PREFIX_MAP[m.serial_prefix.toUpperCase()] = m.material_type.toUpperCase();
+                        }
+                    });
+                    if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
+                    if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
+                    console.log('Built prefix map from machines:', PREFIX_MAP);
+                }
+            } catch (err) {
+                console.warn('Prefix map fetch failed, using default:', err);
+            }
+        }
+
         let html5QrCode;
         let isTorchOn = false;
         const LS_HIST = 'assembly_history';
@@ -187,6 +233,7 @@
         document.addEventListener("DOMContentLoaded", () => { 
             initDate();
             fetchMachines();  // NEW — fetch machine list from registry
+    fetchPrefixMap(MACHINES_URL);  // NEW — fetch dynamic prefix map
             runSync(); 
         });
 
@@ -330,7 +377,7 @@
                 const cells = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
                 for (const [idx, modelName] of Object.entries(machineCols)) {
                     const s = cells[idx] ? cells[idx].trim().toUpperCase() : "";
-                    if (s.startsWith("KM") || s.startsWith("SSKM")) map[s] = modelName;
+                    if (isKnownSerial(s)) map[s] = modelName;
                 }
             }
             localStorage.setItem(LS_WIRE_MAP, JSON.stringify(map));
@@ -364,7 +411,7 @@
                 
                 for (const [idx, name] of Object.entries(machineCols)) {
                     const s = cells[idx] ? cells[idx].trim().toUpperCase() : "";
-                    if (s.startsWith("KM") || s.startsWith("SSKM")) {
+                    if (isKnownSerial(s)) {
                         if (dateObj >= cutoff) {
                             history.push({ serial: s, type: name, date: dateStr, status: 'synced' });
                         }
@@ -382,7 +429,7 @@
                 { fps: 25, qrbox: (vw, vh) => { return { width: vw * 0.85, height: vh * 0.75 }; } }, 
                 (text) => {
                     const up = text.trim().toUpperCase();
-                    if (up.startsWith("KM") || up.startsWith("SSKM")) {
+                    if (isKnownSerial(up)) {
                         document.getElementById('field-serial').value = up;
                         handleSerialInput(); 
                         vibe(50);
@@ -496,7 +543,7 @@
             const history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
             const list = history.slice(-50).reverse();
             target.innerHTML = list.map(i => {
-                const prefix = i.serial.startsWith("SSKM") ? "SS" : "MS";
+                const prefix = getMaterialTypeFromSerial(i.serial) || "MS";
                 const fullName = `${prefix} ${i.type}`;
                 return `
                 <div class="history-item">

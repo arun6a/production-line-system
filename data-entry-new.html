@@ -318,12 +318,21 @@ function isKnownSerial(serial) {
         }
 
         async function fetchPrefixMap(url) {
+            // Load from localStorage FIRST (instant — no network delay)
+            try {
+                const cached = localStorage.getItem('prefix_map_cache');
+                if (cached) {
+                    PREFIX_MAP = JSON.parse(cached);
+                    console.log('Loaded cached prefix map:', PREFIX_MAP);
+                }
+            } catch(e) {}
+
+            // Fetch fresh in background (updates cache for next time)
             try {
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data.prefixMap) {
                     PREFIX_MAP = data.prefixMap;
-                    console.log('Loaded prefix map:', PREFIX_MAP);
                 } else if (data.machines) {
                     PREFIX_MAP = {};
                     data.machines.forEach(m => {
@@ -333,24 +342,25 @@ function isKnownSerial(serial) {
                     });
                     if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
                     if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
-                    console.log('Built prefix map from machines:', PREFIX_MAP);
                 }
+                // Save to localStorage for next app open (instant load)
+                localStorage.setItem('prefix_map_cache', JSON.stringify(PREFIX_MAP));
+                console.log('Updated prefix map cache');
             } catch (err) {
-                
-        // Re-render/re-sync after PREFIX_MAP loads (fixes "MS AIDM" → "SS AIDM")
-        try {
-            if (typeof _prefixMapResynced === 'undefined') {
-                _prefixMapResynced = false;
+                console.warn('Prefix map fetch failed, using cached/default:', err);
             }
-            if (!_prefixMapResynced) {
-                _prefixMapResynced = true;
-                // Call whichever re-render function exists in this app
-                if (typeof renderHistory === 'function') renderHistory();
-                if (typeof wrRenderHistory === 'function') wrRenderHistory();
-                if (typeof fetchData === 'function') fetchData(true);
-                else if (typeof runSync === 'function') runSync();
-                console.log('Re-rendered after PREFIX_MAP loaded');
-            }
+            // Re-render with loaded prefix map
+            try {
+                if (typeof _prefixMapResynced === 'undefined') _prefixMapResynced = false;
+                if (!_prefixMapResynced) {
+                    _prefixMapResynced = true;
+                    if (typeof renderHistory === 'function') renderHistory();
+                    if (typeof wrRenderHistory === 'function') wrRenderHistory();
+                    if (typeof fetchData === 'function') fetchData(true);
+                    else if (typeof runSync === 'function') runSync();
+                    console.log('Re-rendered after PREFIX_MAP loaded');
+                }
+            } catch(e) { console.warn('Re-render failed:', e); }
         } catch(e) { console.warn('Re-render after prefix map failed:', e); }
 
             console.warn('Prefix map fetch failed, using default:', err);

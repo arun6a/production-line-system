@@ -473,7 +473,7 @@ function isKnownSerial(serial) {
   let currentTab = 'wiring';
 
   // ── INIT ──────────────────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', async function() {
     lucide.createIcons();
     wrInitDate();
     checkNotifPermission();
@@ -484,13 +484,15 @@ function isKnownSerial(serial) {
     // Hide loading after 1.8s same as original
     setTimeout(hideLoading, 1800);
 
+    // CRITICAL: Load prefix map BEFORE any data parsing
+    await fetchPrefixMap(MACHINES_URL);
+
     // Start scanner
     wrStartScanner();
 
     // Load data in background
     svcLoad();
-    wrFetchMachines();  // NEW — fetch machine list from registry
-    fetchPrefixMap(MACHINES_URL);  // NEW — fetch dynamic prefix map
+    wrFetchMachines();  // fetch machine list for button grid
     wrRunSync();
     svcStartPolling();
 

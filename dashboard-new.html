@@ -814,6 +814,52 @@
             '#F44336', '#03A9F4', '#8BC34A'
         ];
         let colorIndex = 0;
+
+        // === DYNAMIC PREFIX MAP (replaces hardcoded SSKM/KM checks) ===
+        let PREFIX_MAP = { 'SSKM': 'SS', 'KM': 'MS' }; // default fallback
+
+        function isKnownSerial(serial) {
+            if (!serial) return false;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return true;
+            }
+            return false;
+        }
+
+        function getMaterialTypeFromSerial(serial) {
+            if (!serial) return null;
+            const upper = serial.toString().toUpperCase();
+            const prefixes = Object.keys(PREFIX_MAP).sort((a, b) => b.length - a.length);
+            for (const prefix of prefixes) {
+                if (upper.startsWith(prefix)) return PREFIX_MAP[prefix];
+            }
+            return null;
+        }
+
+        async function fetchPrefixMap(url) {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.prefixMap) {
+                    PREFIX_MAP = data.prefixMap;
+                    console.log('Loaded prefix map:', PREFIX_MAP);
+                } else if (data.machines) {
+                    PREFIX_MAP = {};
+                    data.machines.forEach(m => {
+                        if (m.status === 'active' && m.serial_prefix) {
+                            PREFIX_MAP[m.serial_prefix.toUpperCase()] = m.material_type.toUpperCase();
+                        }
+                    });
+                    if (!PREFIX_MAP['SSKM']) PREFIX_MAP['SSKM'] = 'SS';
+                    if (!PREFIX_MAP['KM']) PREFIX_MAP['KM'] = 'MS';
+                    console.log('Built prefix map from machines:', PREFIX_MAP);
+                }
+            } catch (err) {
+                console.warn('Prefix map fetch failed, using default:', err);
+            }
+        }
         // === HASH-BASED STABLE COLOR ASSIGNMENT ===
         // Each machine name gets a STABLE color based on its name hash.
         // This means: same machine = same color across syncs and app restarts.
@@ -892,12 +938,12 @@
             const data = rows.map((row, idx) => {
                 const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
                 let fDate = null, fSerial = null, fInvoice = "N/A", names = [];
-                cells.forEach(val => { const up = val.toUpperCase(); if (up.startsWith("SSKM") || up.startsWith("KM")) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
+                cells.forEach(val => { const up = val.toUpperCase(); if (isKnownSerial(up)) fSerial = up; else if (val.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/)) fDate = parseDate(val); else if (up.match(/^D\d{3,}$/) || val.match(/^\d{3,6}$/) || up.startsWith("INVOICE")) fInvoice = up; else if (val.length > 3 && !up.includes("AC200")) names.push(val); });
                 if(!fSerial) return null;
                 let fCust = names.filter(n => n.includes(" ")).reduce((a,b) => a.length > b.length ? a : b, names[0] || "Unknown Customer");
                 if(fCust !== "Unknown Customer") customerFrequency[fCust] = (customerFrequency[fCust] || 0) + 1;
                 const isDataIssue = fDate && fDate.getFullYear() === 2000;
-                return { id: `dispatch-${idx}`, stage: 'dispatch', serial: fSerial, type: fSerial.startsWith("SSKM") ? 'SS' : 'MS', invoice: fInvoice, isPickup: fInvoice.match(/^\d{3,4}$/), customer: fCust, dateObj: fDate, dateStr: fDate ? fDate.toLocaleDateString('en-GB') : 'N/A', hasDateIssue: isDataIssue, raw: row.toLowerCase() };
+                return { id: `dispatch-${idx}`, stage: 'dispatch', serial: fSerial, type: getMaterialTypeFromSerial(fSerial) || 'MS', invoice: fInvoice, isPickup: fInvoice.match(/^\d{3,4}$/), customer: fCust, dateObj: fDate, dateStr: fDate ? fDate.toLocaleDateString('en-GB') : 'N/A', hasDateIssue: isDataIssue, raw: row.toLowerCase() };
             }).filter(i => i !== null);
             return data;
         }
@@ -917,7 +963,7 @@
                 const dateVal = (dateColIndex !== -1 && cells[dateColIndex]) ? cells[dateColIndex] : null; const dateObj = parseDate(dateVal);
                 cells.forEach((val, idx) => {
                     if (ignoreIndices.has(idx)) return; const serial = val.trim().toUpperCase(); if (!serial) return;
-                    let machineType = null; if (serial.startsWith("SSKM")) machineType = 'SS'; else if (serial.startsWith("KM")) machineType = 'MS';
+                    let machineType = getMaterialTypeFromSerial(serial);
                     if (machineType) {
                         const machineName = rawHeaders[idx] || 'Unknown'; const displayName = `${machineType} ${machineName}`;
                         getMachineColor(displayName);

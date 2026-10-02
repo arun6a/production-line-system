@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="KM Demo">
+<meta name="theme-color" content="#007aff">
 <title>KM Demo Tracker</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
@@ -320,26 +325,49 @@
   }
   .toast.show { opacity: 1; }
 
-  /* === TAB BAR === */
-  .tab-bar {
-    position: sticky; top: 0; z-index: 15;
-    background: #ffffff;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-    padding: 8px 12px;
-    padding-top: max(8px, env(safe-area-inset-top));
-    display: flex; gap: 8px;
-  }
-  .tab-btn {
-    flex: 1;
-    background: #f1f1f4; color: #1c1c1e;
-    border: none; border-radius: 10px;
-    padding: 10px; font-size: 13px; font-weight: 700;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .tab-btn.active {
+  /* === TAB BAR (REMOVED — now single toggle button in header) === */
+  .view-toggle-btn {
     background: #007aff; color: white;
+    border: none; border-radius: 8px;
+    padding: 8px 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+    -webkit-touch-callout: none;
   }
-  .tab-btn:active { transform: scale(0.97); }
+  .view-toggle-btn:active { transform: scale(0.95); background: #0066d6; }
+
+  /* === SPLASH SCREEN === */
+  #splash {
+    position: fixed; inset: 0; z-index: 1000;
+    background: linear-gradient(135deg, #007aff 0%, #0066d6 100%);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    padding: 20px;
+    transition: opacity 0.4s ease;
+  }
+  #splash.hide { opacity: 0; pointer-events: none; }
+  .splash-logo {
+    width: 90px; height: 90px; border-radius: 22px; object-fit: cover;
+    margin-bottom: 24px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    animation: logoPulse 2s ease-in-out infinite;
+  }
+  @keyframes logoPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  .splash-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.25);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .splash-status { font-size: 13px; font-weight: 600; opacity: 0.95; }
+  .splash-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .splash-sub { font-size: 11px; opacity: 0.8; margin-bottom: 24px; }
 
   /* VIEWS */
   .view { display: none; }
@@ -413,10 +441,13 @@
 </head>
 <body>
 
-<!-- TAB BAR -->
-<div class="tab-bar">
-  <button class="tab-btn active" id="tabStaff" data-view="staff">Staff</button>
-  <button class="tab-btn" data-view="dashboard">Dashboard</button>
+<!-- SPLASH SCREEN (shown on launch, hidden after first refresh) -->
+<div id="splash">
+  <img class="splash-logo" src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" alt="KM">
+  <div class="splash-title">KM Demo Tracker</div>
+  <div class="splash-sub">Customer demo visit system</div>
+  <div class="splash-spinner"></div>
+  <div class="splash-status" id="splashStatus">Syncing data...</div>
 </div>
 
 <!-- HEADER -->
@@ -430,6 +461,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span id="statusText">—</span>
   </div>
+  <button class="view-toggle-btn" id="viewToggleBtn" data-target="dashboard">Dashboard</button>
 </div>
 
 <!-- ============ STAFF VIEW ============ -->
@@ -810,12 +842,22 @@ function fmtTimer(isoStart) {
 
 async function init() {
   $('todayDate').textContent = fmtDate(new Date());
+  $('splashStatus').textContent = 'Loading machines & attachments...';
   await loadMachinesAndAttachments();
   renderHourlySkeleton();
   renderWeeklySkeleton();
+  $('splashStatus').textContent = 'Syncing demo data...';
   await refreshAll();
   startAutoRefresh();
   setStatus(true);
+  // Hide splash after first successful sync
+  setTimeout(() => {
+    const splash = $('splash');
+    if (splash) {
+      splash.classList.add('hide');
+      setTimeout(() => splash.remove(), 500);
+    }
+  }, 300);
 }
 
 async function loadMachinesAndAttachments() {
@@ -957,7 +999,8 @@ function renderCompleted(visits) {
     const ob = outcomeBadge(v.outcome);
     const purchChips = (v.machinesPurchased || '').split(',').filter(Boolean).map(p => `<span class="chip green" style="background:#d4f5dd;color:#166534;">${p.trim()}</span>`).join(' ');
     const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
-    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const attDemoChips = (v.attachmentsDemoed || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip" style="background:#ffe9d9;color:#8a3b00;">${a.trim()}</span>`).join(' ');
     const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip returning">Returning</span>` : '';
     const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
@@ -971,8 +1014,9 @@ function renderCompleted(visits) {
         <div class="visit-row"><span class="label">Time:</span> ${fmtTime(v.startTime)} – ${fmtTime(v.endTime)} (${fmtElapsed(v.demoMinutes || 0)})</div>
         <div class="visit-row"><span class="label">Wait:</span> ${waitStr}</div>
         <div class="visit-row"><span class="label">Demoed:</span> <div class="chip-list">${demoChips || '<span style="color:#8c8c92;font-size:11px;">none</span>'}</div></div>
+        ${attDemoChips ? `<div class="visit-row"><span class="label">Attach Demoed:</span> <div class="chip-list">${attDemoChips}</div></div>` : ''}
         ${purchChips ? `<div class="visit-row"><span class="label">Bought:</span> <div class="chip-list">${purchChips}</div></div>` : ''}
-        ${attChips ? `<div class="visit-row"><span class="label">Attach:</span> <div class="chip-list">${attChips}</div></div>` : ''}
+        ${attChips ? `<div class="visit-row"><span class="label">Attach Bought:</span> <div class="chip-list">${attChips}</div></div>` : ''}
         ${redemoBadge ? `<div style="margin-top:6px;">${redemoBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;margin-top:4px;">"${v.outcomeNotes}"</div>` : ''}
         <button class="btn-edit" onclick="openEdit(${v.rowId})">Edit</button>
@@ -1408,18 +1452,26 @@ $('saveNotesBtn').addEventListener('click', async () => {
   setTimeout(() => $('notesStatus').textContent = '', 3000);
 });
 
-// ====== TAB SWITCHING ======
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const view = btn.dataset.view;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view' + capitalize(view)));
-    // Hide the staff FAB when dashboard is active
-    const fab = $('checkinFab');
-    if (fab) fab.style.display = view === 'staff' ? 'flex' : 'none';
-  });
+// ====== VIEW TOGGLE BUTTON (single button, switches Staff ↔ Dashboard) ======
+const viewToggleBtn = $('viewToggleBtn');
+viewToggleBtn.addEventListener('click', () => {
+  const currentTarget = viewToggleBtn.dataset.target;
+  if (currentTarget === 'dashboard') {
+    // Currently staff → switch to dashboard
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'viewDashboard'));
+    viewToggleBtn.dataset.target = 'staff';
+    viewToggleBtn.textContent = '← Staff';
+    // Hide staff FAB on dashboard view
+    $('checkinFab').style.display = 'none';
+  } else {
+    // Currently dashboard → switch back to staff
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'viewStaff'));
+    viewToggleBtn.dataset.target = 'dashboard';
+    viewToggleBtn.textContent = 'Dashboard';
+    $('checkinFab').style.display = 'flex';
+  }
+  // After switching, the live timers keep running — both views update together
 });
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ====== DASHBOARD RENDER FUNCTIONS ======
 
@@ -1498,7 +1550,8 @@ function renderDashboardCompleted(visits) {
     const ob = outcomeBadge(v.outcome);
     const purchChips = (v.machinesPurchased || '').split(',').filter(Boolean).map(p => `<span class="chip" style="background:#d4f5dd;color:#166534;">${p.trim()}</span>`).join(' ');
     const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
-    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const attDemoChips = (v.attachmentsDemoed || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip" style="background:#ffe9d9;color:#8a3b00;">${a.trim()}</span>`).join(' ');
     const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip returning">Returning</span>` : '';
     const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
@@ -1512,8 +1565,9 @@ function renderDashboardCompleted(visits) {
         <div class="visit-row"><span class="label">Time:</span> ${fmtTime(v.startTime)} – ${fmtTime(v.endTime)} (${fmtElapsed(v.demoMinutes || 0)})</div>
         <div class="visit-row"><span class="label">Wait:</span> ${waitStr}</div>
         <div class="visit-row"><span class="label">Demoed:</span> <div class="chip-list">${demoChips || '<span style="color:#8c8c92;font-size:11px;">none</span>'}</div></div>
+        ${attDemoChips ? `<div class="visit-row"><span class="label">Attach Demoed:</span> <div class="chip-list">${attDemoChips}</div></div>` : ''}
         ${purchChips ? `<div class="visit-row"><span class="label">Bought:</span> <div class="chip-list">${purchChips}</div></div>` : ''}
-        ${attChips ? `<div class="visit-row"><span class="label">Attach:</span> <div class="chip-list">${attChips}</div></div>` : ''}
+        ${attChips ? `<div class="visit-row"><span class="label">Attach Bought:</span> <div class="chip-list">${attChips}</div></div>` : ''}
         ${redemoBadge ? `<div style="margin-top:6px;">${redemoBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;margin-top:4px;">"${v.outcomeNotes}"</div>` : ''}
       </div>`;

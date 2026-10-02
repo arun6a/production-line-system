@@ -223,7 +223,7 @@ function isKnownSerial(serial) {
         const LS_HIST = 'dispatch_history'; const LS_TIME = 'dispatch_sync_time';
         let pendingQueue = JSON.parse(localStorage.getItem('dispatch_pending') || "[]");
 
-        document.addEventListener("DOMContentLoaded", async () => { initDate(); await fetchPrefixMap(MACHINES_URL); runSync(); });
+        document.addEventListener("DOMContentLoaded", async () => { initDate(); fetchPrefixMap(MACHINES_URL); runSync(); });
         function initDate() { document.getElementById('field-date').value = new Date().toISOString().split('T')[0]; }
         function toggleHistory() { document.getElementById('history-modal').classList.toggle('open'); }
 
@@ -258,25 +258,31 @@ function isKnownSerial(serial) {
         // --- SYNC LOGIC ---
         async function runSync() {
             const btn = document.getElementById('sync-btn');
-            btn.innerText = "...";
+            if (btn) btn.innerText = "...";
+            
+            // Helper: always hide loading screen
+            function hideLoader() {
+                const loader = document.getElementById('loading-screen');
+                const mainContainer = document.getElementById('main-container');
+                if (loader) { loader.classList.add('fade-out'); }
+                if (mainContainer) { mainContainer.classList.add('visible'); }
+                setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
+            }
+            
             try {
                 const res = await fetch(CSV_URL + '&t=' + Date.now()); const text = await res.text(); parseDispatch(text);
                 localStorage.setItem(LS_TIME, new Date().toLocaleTimeString());
                 document.getElementById('sync-time').innerText = localStorage.getItem(LS_TIME);
                 updateGoal(); renderHistory(); updatePendingUI(); handleSerialInput(); 
                 if (!html5QrCode) startScanner();
-                btn.innerText = "🔄";
-                
-                // HIDE LOADING SCREEN
-                const loader = document.getElementById('loading-screen');
-                const mainContainer = document.getElementById('main-container');
-                loader.classList.add('fade-out');
-                mainContainer.classList.add('visible');
-                setTimeout(() => { loader.style.display = 'none'; }, 500);
-
+                if (btn) btn.innerText = "🔄";
             } catch (e) { 
+                console.error('Sync failed:', e);
                 if (!html5QrCode) startScanner(); 
             }
+            
+            // ALWAYS hide loading screen — whether sync succeeded or failed
+            hideLoader();
         }
 
         function parseDispatch(text) {

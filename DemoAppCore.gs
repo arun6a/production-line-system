@@ -435,6 +435,26 @@ function getTodaySummary() {
       }
     }
 
+    // Weekly (last 7 days) and monthly stats
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 6);  // 7 days including today
+    const weekAgoStr = formatDate(weekAgo);
+    const monthPrefix = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+    let weeklyVisits = 0, weeklyPurchased = 0, monthlyVisits = 0, monthlyPurchased = 0;
+    for (let i = 1; i < data.length; i++) {
+      const rowDate = formatDate(data[i][0]);
+      if (rowDate >= weekAgoStr && rowDate <= today) {
+        weeklyVisits++;
+        if ((data[i][8] || '').toLowerCase() === 'purchased') weeklyPurchased++;
+      }
+      if (rowDate.substring(0, 7) === monthPrefix) {
+        monthlyVisits++;
+        if ((data[i][8] || '').toLowerCase() === 'purchased') monthlyPurchased++;
+      }
+    }
+
     return jsonResponse({
       summary: {
         today: today,
@@ -453,7 +473,11 @@ function getTodaySummary() {
         activeElapsedMinutes: activeElapsedMinutes,
         totalWaitMinutes: totalWaitMinutes,
         waitingElapsedMinutes: waitingElapsedMinutes,
-        hourlyBreakdown: hourly
+        hourlyBreakdown: hourly,
+        weeklyVisits: weeklyVisits,
+        weeklyPurchased: weeklyPurchased,
+        monthlyVisits: monthlyVisits,
+        monthlyPurchased: monthlyPurchased
       }
     });
   } catch (err) {

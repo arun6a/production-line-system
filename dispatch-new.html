@@ -384,16 +384,41 @@ function isKnownSerial(serial) {
         function renderHistory() {
             const target = document.getElementById('history-list');
             const history = JSON.parse(localStorage.getItem(LS_HIST) || "[]");
-            const list = history.slice(-50).reverse();
-            target.innerHTML = list.map(i => `
-                <div class="history-item">
-                    <span style="font-weight:600;">
-                        <span class="status-dot" style="background:${i.status==='pending'?'var(--orange)':'var(--green)'}"></span>
-                        ${i.customer} <span style="opacity:0.6; font-size:11px">${i.serial.substring(0,10)}</span>
-                    </span>
-                    <span style="color:var(--sub); font-size:12px">${i.date}</span>
-                </div>
-            `).join('');
+            const list = history.slice(-100).reverse();
+            
+            // Group by date
+            const grouped = {};
+            list.forEach(i => {
+                const d = i.date || 'Unknown Date';
+                if (!grouped[d]) grouped[d] = [];
+                grouped[d].push(i);
+            });
+            
+            // Machine type colors
+            const machineColors = {
+                'SS CIDM':'#ff9500','SS CSEM':'#ff6b35','SS CSIM':'#ff5e62','SS CCBM':'#ff8c42','SS CIDM110':'#ffa733',
+                'MS CIDM':'#007aff','MS CSEM':'#0091ff','MS CSIM':'#00a3ff','MS CCBM':'#0078e0','MS CIDM110':'#0085e0',
+                'SS AIDM':'#34c759','MS AIDM':'#5856d6'
+            };
+            function getMachineColor(fullName) {
+                if (machineColors[fullName]) return machineColors[fullName];
+                let hash = 0;
+                for (let j = 0; j < fullName.length; j++) { hash = ((hash << 5) - hash) + fullName.charCodeAt(j); hash = hash & hash; }
+                return '#' + Math.abs(hash).toString(16).substring(0,6).padEnd(6,'0');
+            }
+            
+            let html = '';
+            Object.keys(grouped).forEach(date => {
+                html += `<div style="margin-top:12px;margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.04);border-radius:8px;font-size:11px;font-weight:800;color:#8e8e93;text-transform:uppercase;letter-spacing:0.5px;">${date}</div>`;
+                grouped[date].forEach(i => {
+                    const prefix = getMaterialTypeFromSerial(i.serial) || 'MS';
+                    const fullName = `${prefix} Machine`;
+                    const color = getMachineColor(fullName);
+                    const invoiceText = i.invoice ? `<span style="color:#8e8e93;font-size:11px;margin-left:6px;">#${i.invoice}</span>` : '';
+                    html += `<div class="history-item"><span style="font-weight:600;"><span class="status-dot" style="background:${i.status==='pending'?'#ff9500':'#34c759'}"></span><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:${color};color:white;font-size:10px;font-weight:700;margin-right:6px;">${fullName}</span>${i.serial.substring(0,14)}${invoiceText}</span><span style="color:#8e8e93;font-size:12px">${i.status==='pending'?'⏳':''}</span></div>`;
+                });
+            });
+            target.innerHTML = html || '<div style="text-align:center;padding:30px;color:#8e8e93;">No history yet</div>';
         }
 
         function updatePendingUI() { const el = document.getElementById('pending-count'); el.innerText = pendingQueue.length + " PENDING"; el.style.display = pendingQueue.length > 0 ? 'inline-block' : 'none'; }

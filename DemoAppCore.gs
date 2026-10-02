@@ -51,6 +51,7 @@ function doPost(e) {
   const action = ((e && e.parameter && e.parameter.action) || bodyData.action || '').toLowerCase();
   switch (action) {
     case 'checkin': return checkIn(bodyData);
+    case 'startdemo': return startDemo(bodyData);
     case 'checkout': return checkOut(bodyData);
     case 'addmachine': return addMachine(bodyData);
     case 'addattachment': return addAttachment(bodyData);
@@ -86,27 +87,31 @@ function checkIn(data) {
       }
     }
     const customerNum = maxNum + 1;
-    const startTime = today.toISOString();
+    const waitStartTime = today.toISOString();
 
-    // Build machines demoed string
+    // Build machines demoed string (planned at check-in)
     const machinesDemoed = Array.isArray(data.machinesDemoed) ? data.machinesDemoed.join(', ') : (data.machinesDemoed || '');
     const attachmentsDemoed = Array.isArray(data.attachmentsDemoed) ? data.attachmentsDemoed.join(', ') : (data.attachmentsDemoed || '');
 
+    // Customer enters WAITING state — StartTime (F) and EndTime (G) left empty.
+    // WaitStartTime (O) is set so the wait timer starts immediately.
     sheet.appendRow([
-      dateStr,                    // A: Date
-      customerNum,               // B: CustomerNum
-      data.fromLocation || '',    // C: FromLocation
-      machinesDemoed,            // D: MachinesDemoed
-      attachmentsDemoed,         // E: AttachmentsDemoed
-      startTime,                 // F: StartTime
-      '',                        // G: EndTime (empty = active)
-      '',                        // H: DemoMinutes (calculated at checkout)
-      '',                        // I: Outcome
-      '',                        // J: OutcomeNotes
-      '',                        // K: MachinesPurchased
-      '',                        // L: AttachmentsPurchased
-      data.returningCustomer ? 'Yes' : 'No',  // M: ReturningCustomer
-      ''                         // N: ReDemoAfterBilling
+      dateStr,                                   // A: Date
+      customerNum,                               // B: CustomerNum
+      data.fromLocation || '',                    // C: FromLocation (optional)
+      machinesDemoed,                             // D: MachinesDemoed (planned)
+      attachmentsDemoed,                          // E: AttachmentsDemoed (planned)
+      '',                                        // F: StartTime (demo start) — empty = waiting
+      '',                                        // G: EndTime
+      '',                                        // H: DemoMinutes
+      '',                                        // I: Outcome
+      '',                                        // J: OutcomeNotes
+      '',                                        // K: MachinesPurchased
+      '',                                        // L: AttachmentsPurchased
+      data.returningCustomer ? 'Yes' : 'No',     // M: ReturningCustomer
+      '',                                        // N: ReDemoAfterBilling
+      waitStartTime,                             // O: WaitStartTime
+      ''                                         // P: WaitMinutes
     ]);
 
     const rowId = sheet.getLastRow();
@@ -116,7 +121,47 @@ function checkIn(data) {
       status: 'success',
       customerNum: customerNum,
       rowId: rowId,
-      startTime: startTime
+      waitStartTime: waitStartTime
+    });
+  } catch (err) {
+    lock.releaseLock();
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+// ==================== START DEMO ====================
+// Moves a customer from WAITING to ACTIVE.
+// Sets StartTime (F) = now, calculates WaitMinutes (P) = now - WaitStartTime.
+
+function startDemo(data) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (!data.rowId) return jsonResponse({ status: 'error', message: 'Missing rowId' });
+    const sheet = getSheet(TABS.DEMO_LOG);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'DemoLog sheet not found' });
+
+    const rowId = parseInt(data.rowId);
+    const now = new Date();
+    const startTime = now.toISOString();
+
+    // Read existing wait start time to calculate wait minutes
+    const waitStartStr = sheet.getRange(rowId, 15).getValue();   // O: WaitStartTime
+    let waitMinutes = 0;
+    if (waitStartStr) {
+      const ws = new Date(waitStartStr);
+      waitMinutes = Math.round((now - ws) / 60000);
+    }
+
+    // Update StartTime (F) and WaitMinutes (P)
+    sheet.getRange(rowId, 6).setValue(startTime);          // F: StartTime (demo start)
+    sheet.getRange(rowId, 16).setValue(waitMinutes);       // P: WaitMinutes
+    lock.releaseLock();
+
+    return jsonResponse({
+      status: 'success',
+      startTime: startTime,
+      waitMinutes: waitMinutes
     });
   } catch (err) {
     lock.releaseLock();
@@ -144,19 +189,24 @@ function checkOut(data) {
       demoMinutes = Math.round((end - start) / 60000);
     }
 
-    // Build purchase strings
+    // Update purchase strings
     const machinesPurchased = Array.isArray(data.machinesPurchased) ? data.machinesPurchased.join(', ') : (data.machinesPurchased || '');
     const attachmentsPurchased = Array.isArray(data.attachmentsPurchased) ? data.attachmentsPurchased.join(', ') : (data.attachmentsPurchased || '');
 
     // Update row
     sheet.getRange(rowId, 7).setValue(endTime);                    // G: EndTime
     sheet.getRange(rowId, 8).setValue(demoMinutes);                // H: DemoMinutes
-    sheet.getRange(rowId, 9).setValue(data.outcome || '');         // I: Outcome
-    sheet.getRange(rowId, 10).setValue(data.outcomeNotes || '');   // J: OutcomeNotes
+    if (data.outcome) sheet.getRange(rowId, 9).setValue(data.outcome);              // I: Outcome (optional)
+    if (data.outcomeNotes !== undefined) sheet.getRange(rowId, 10).setValue(data.outcomeNotes);  // J: OutcomeNotes
     sheet.getRange(rowId, 11).setValue(machinesPurchased);         // K: MachinesPurchased
-    sheet.getRange(rowId, 12).setValue(attachmentsPurchased);       // L: AttachmentsPurchased
+    sheet.getRange(rowId, 12).setValue(attachmentsPurchased);      // L: AttachmentsPurchased
 
-    // Also update attachments demoed if changed
+    // Update machines demoed if provided (additional demos done during visit)
+    if (data.machinesDemoed) {
+      const machDemoed = Array.isArray(data.machinesDemoed) ? data.machinesDemoed.join(', ') : data.machinesDemoed;
+      sheet.getRange(rowId, 4).setValue(machDemoed);
+    }
+    // Update attachments demoed if provided
     if (data.attachmentsDemoed) {
       const attDemoed = Array.isArray(data.attachmentsDemoed) ? data.attachmentsDemoed.join(', ') : data.attachmentsDemoed;
       sheet.getRange(rowId, 5).setValue(attDemoed);
@@ -188,41 +238,61 @@ function updateReDemo(data) {
   }
 }
 
-// ==================== GET ACTIVE VISITS ====================
+// ==================== GET ACTIVE + WAITING VISITS ====================
+// Returns both arrays: active (demo in progress) and waiting (checked in, demo not yet started).
 
 function getActiveVisits() {
   try {
     const sheet = getSheet(TABS.DEMO_LOG);
-    if (!sheet) return jsonResponse({ visits: [] });
+    if (!sheet) return jsonResponse({ active: [], waiting: [] });
 
     const data = sheet.getDataRange().getValues();
     const now = new Date();
-    const visits = [];
+    const active = [];
+    const waiting = [];
 
     for (let i = 1; i < data.length; i++) {
-      const endTime = data[i][6]; // column G
+      const endTime = data[i][6];        // G
+      const startTime = data[i][5];      // F (demo start)
+      const waitStartTime = data[i][14]; // O (check-in time)
+
       if (!endTime || endTime === '') {
-        // Active visit (no end time)
-        const startTime = data[i][5] ? new Date(data[i][5]) : null;
-        let elapsedMinutes = 0;
-        if (startTime) {
-          elapsedMinutes = Math.round((now - startTime) / 60000);
+        if (startTime && startTime !== '') {
+          // ACTIVE: demo started, not yet checked out
+          const start = new Date(startTime);
+          const elapsed = Math.round((now - start) / 60000);
+          active.push({
+            rowId: i + 1,
+            date: formatDate(data[i][0]),
+            customerNum: data[i][1],
+            fromLocation: data[i][2],
+            machinesDemoed: data[i][3],
+            attachmentsDemoed: data[i][4],
+            startTime: startTime,
+            elapsedMinutes: elapsed,
+            returningCustomer: data[i][12],
+            reDemo: data[i][13],
+            waitMinutes: data[i][15]
+          });
+        } else if (waitStartTime && waitStartTime !== '') {
+          // WAITING: checked in but demo not yet started
+          const ws = new Date(waitStartTime);
+          const waited = Math.round((now - ws) / 60000);
+          waiting.push({
+            rowId: i + 1,
+            date: formatDate(data[i][0]),
+            customerNum: data[i][1],
+            fromLocation: data[i][2],
+            machinesDemoed: data[i][3],
+            attachmentsDemoed: data[i][4],
+            waitStartTime: waitStartTime,
+            waitedMinutes: waited,
+            returningCustomer: data[i][12]
+          });
         }
-        visits.push({
-          rowId: i + 1,
-          date: formatDate(data[i][0]),
-          customerNum: data[i][1],
-          fromLocation: data[i][2],
-          machinesDemoed: data[i][3],
-          attachmentsDemoed: data[i][4],
-          startTime: data[i][5],
-          elapsedMinutes: elapsedMinutes,
-          returningCustomer: data[i][12],
-          reDemo: data[i][13]
-        });
       }
     }
-    return jsonResponse({ visits: visits });
+    return jsonResponse({ active: active, waiting: waiting });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
@@ -239,10 +309,10 @@ function getTodaySummary() {
     const today = formatDate(new Date());
     const now = new Date();
 
-    let totalVisits = 0, activeCount = 0, purchased = 0, buyingLater = 0, quotation = 0;
+    let totalVisits = 0, activeCount = 0, waitingCount = 0, purchased = 0, buyingLater = 0, quotation = 0;
     let courier = 0, justVisiting = 0, wrongMachine = 0, empty = 0;
-    let totalDemoMinutes = 0;
-    let activeElapsedMinutes = 0;
+    let totalDemoMinutes = 0, totalWaitMinutes = 0;
+    let activeElapsedMinutes = 0, waitingElapsedMinutes = 0;
 
     for (let i = 1; i < data.length; i++) {
       if (formatDate(data[i][0]) !== today) continue;
@@ -250,12 +320,20 @@ function getTodaySummary() {
 
       const endTime = data[i][6];
       const startTime = data[i][5] ? new Date(data[i][5]) : null;
+      const waitStart = data[i][14] ? new Date(data[i][14]) : null;
 
       if (!endTime || endTime === '') {
-        // Active
-        activeCount++;
+        // Not yet checked out
         if (startTime) {
-          activeElapsedMinutes += Math.round((now - startTime) / 60000);
+          // Active demo
+          activeCount++;
+          if (startTime) {
+            activeElapsedMinutes += Math.round((now - startTime) / 60000);
+          }
+        } else if (waitStart) {
+          // Waiting to start demo
+          waitingCount++;
+          waitingElapsedMinutes += Math.round((now - waitStart) / 60000);
         }
       } else {
         // Completed
@@ -263,7 +341,11 @@ function getTodaySummary() {
         totalDemoMinutes += demoMin;
       }
 
-      const outcome = data[i][8] || '';
+      // Always count wait minutes (set at startDemo time)
+      const wMin = parseInt(data[i][15]) || 0;
+      totalWaitMinutes += wMin;
+
+      const outcome = (data[i][8] || '').toLowerCase();
       switch (outcome.toLowerCase()) {
         case 'purchased': purchased++; break;
         case 'buying later': buyingLater++; break;
@@ -275,14 +357,16 @@ function getTodaySummary() {
       }
     }
 
-    // Hourly breakdown
+    // Hourly breakdown (based on demo start time, falling back to wait start if demo not yet started)
     const hourly = {};
     for (let h = 9; h <= 18; h++) hourly[h + ':00'] = 0;
     for (let i = 1; i < data.length; i++) {
       if (formatDate(data[i][0]) !== today) continue;
-      const startTime = data[i][5] ? new Date(data[i][5]) : null;
-      if (startTime) {
-        const h = startTime.getHours();
+      let t = data[i][5]; // F: StartTime (demo start)
+      if (!t) t = data[i][14]; // O: WaitStartTime (check-in time) if demo not yet started
+      if (t) {
+        const dt = new Date(t);
+        const h = dt.getHours();
         const key = h + ':00';
         if (hourly[key] !== undefined) hourly[key]++;
       }
@@ -290,8 +374,10 @@ function getTodaySummary() {
 
     return jsonResponse({
       summary: {
+        today: today,
         totalVisits: totalVisits,
         activeCount: activeCount,
+        waitingCount: waitingCount,
         purchased: purchased,
         buyingLater: buyingLater,
         quotation: quotation,
@@ -302,6 +388,8 @@ function getTodaySummary() {
         conversionRate: totalVisits > 0 ? Math.round((purchased / totalVisits) * 100) : 0,
         totalDemoMinutes: totalDemoMinutes,
         activeElapsedMinutes: activeElapsedMinutes,
+        totalWaitMinutes: totalWaitMinutes,
+        waitingElapsedMinutes: waitingElapsedMinutes,
         hourlyBreakdown: hourly
       }
     });
@@ -333,7 +421,7 @@ function getRecentVisits(limit) {
         fromLocation: row[2],
         machinesDemoed: row[3],
         attachmentsDemoed: row[4],
-        startTime: row[5],
+        startTime: row[5],         // F: demo start time
         endTime: row[6],
         demoMinutes: row[7],
         outcome: row[8],
@@ -341,10 +429,15 @@ function getRecentVisits(limit) {
         machinesPurchased: row[10],
         attachmentsPurchased: row[11],
         returningCustomer: row[12],
-        reDemo: row[13]
+        reDemo: row[13],
+        waitStartTime: row[14],   // O: check-in time
+        waitMinutes: row[15]       // P: wait duration
       });
     }
-    return jsonResponse({ visits: visits });
+    return jsonResponse({
+      today: formatDate(new Date()),
+      visits: visits
+    });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
@@ -584,7 +677,7 @@ function setupSheet() {
     const logHeaders = ['Date', 'CustomerNum', 'FromLocation', 'MachinesDemoed',
       'AttachmentsDemoed', 'StartTime', 'EndTime', 'DemoMinutes', 'Outcome',
       'OutcomeNotes', 'MachinesPurchased', 'AttachmentsPurchased',
-      'ReturningCustomer', 'ReDemoAfterBilling'];
+      'ReturningCustomer', 'ReDemoAfterBilling', 'WaitStartTime', 'WaitMinutes'];
     const logSheet = ensureTab(TABS.DEMO_LOG, logHeaders, logHeaders.length);
     for (let i = 1; i <= logHeaders.length; i++) logSheet.autoResizeColumn(i);
     Logger.log('[1] OK — DemoLog ready');

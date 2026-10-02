@@ -122,6 +122,19 @@
   .outcome-tile.visiting .ov { color: #8c8c92; }
   .outcome-tile.wrong .ov { color: #ff3b30; }
 
+  /* OUTCOME BADGE (small, for completed card header) */
+  .outcome-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .ob-purchased { background: #d4f5dd; color: #166534; }
+  .ob-later { background: #fff4d0; color: #6b4a00; }
+  .ob-quotation { background: #e0ecff; color: #00408a; }
+  .ob-courier { background: #f0e0ff; color: #4a0080; }
+  .ob-visiting { background: #f1f1f4; color: #3c3c43; }
+  .ob-wrong { background: #ffe0d9; color: #8a1f00; }
+  .ob-empty { background: #f1f1f4; color: #8c8c92; }
+
   /* EMPTY STATE */
   .empty-state { text-align: center; padding: 16px; color: #6c6c70; font-size: 12px; font-weight: 600; }
 
@@ -137,6 +150,139 @@
   .detail-row:last-child { border-bottom: none; }
   .detail-row .dk { color: #6c6c70; font-weight: 600; }
   .detail-row .dv { color: #1c1c1e; font-weight: 700; text-align: right; }
+
+  /* === MODAL === */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.5);
+    display: none; align-items: flex-end; justify-content: center;
+    animation: fadeIn 0.2s;
+  }
+  .modal-overlay.visible { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-sheet {
+    background: white;
+    width: 100%; max-width: 500px;
+    max-height: 92vh; overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    animation: slideUp 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 36px; height: 4px; background: #d1d1d6; border-radius: 2px; margin: 0 auto 14px; }
+  .modal-title { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: #6c6c70; font-weight: 600; margin-bottom: 16px; }
+  .modal-section { margin-bottom: 18px; }
+  .modal-section-label {
+    font-size: 12px; font-weight: 700; color: #6c6c70;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid #f1f1f4;
+  }
+  .toggle-row .toggle-label { font-size: 14px; font-weight: 600; }
+  .toggle {
+    width: 44px; height: 26px; background: #d1d1d6; border-radius: 13px;
+    position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 22px; height: 22px; background: white; border-radius: 50%;
+    transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.on { background: #34c759; }
+  .toggle.on::after { transform: translateX(18px); }
+
+  .text-input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid #d1d1d6; border-radius: 8px;
+    font-size: 14px; font-family: inherit;
+    background: white; color: #1c1c1e;
+    -webkit-user-select: text; user-select: text;
+  }
+  .text-input:focus { outline: none; border-color: #007aff; }
+  textarea.text-input { resize: vertical; min-height: 60px; }
+  select.text-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236c6c70' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .multichips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .multichip {
+    background: #f1f1f4; color: #1c1c1e;
+    padding: 8px 12px; border-radius: 16px;
+    font-size: 13px; font-weight: 600;
+    border: 2px solid transparent;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .multichip.selected { background: #007aff; color: white; border-color: #0066d6; }
+  .multichip:active { transform: scale(0.95); }
+
+  /* SS/MS TOGGLE inside chip */
+  .multichip-with-toggle {
+    display: flex; align-items: center; gap: 6px;
+    background: #f1f1f4; padding: 4px 4px 4px 10px;
+    border-radius: 18px; border: 2px solid transparent;
+    transition: all 0.15s; cursor: pointer;
+  }
+  .multichip-with-toggle.selected { background: #007aff; border-color: #0066d6; }
+  .multichip-with-toggle.selected .toggle-ssms { background: rgba(255,255,255,0.25); }
+  .multichip-name { font-size: 13px; font-weight: 600; }
+  .toggle-ssms { background: rgba(0,0,0,0.08); border-radius: 12px; display: flex; padding: 2px; gap: 2px; }
+  .toggle-ssms-btn { padding: 4px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #6c6c70; cursor: pointer; }
+  .toggle-ssms-btn.active { background: white; color: #1c1c1e; }
+  .multichip-with-toggle.selected .toggle-ssms-btn.active { color: #007aff; }
+  .multichip-with-toggle.selected .toggle-ssms-btn { color: rgba(255,255,255,0.7); }
+
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .btn-cancel {
+    flex: 1; background: #f1f1f4; color: #1c1c1e;
+    border: none; border-radius: 10px; padding: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .btn-cancel:active { background: #e5e5ea; }
+  .btn-primary {
+    flex: 2; background: #ff6b35; color: white;
+    border: none; border-radius: 10px; padding: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .btn-primary:active { background: #e85f2e; }
+  .btn-primary:disabled { background: #ffcfc0; cursor: not-allowed; }
+
+  /* EDIT BUTTON on completed card */
+  .btn-edit {
+    margin-top: 8px; width: 100%;
+    background: #f1f1f4; color: #1c1c1e;
+    border: 1px solid rgba(0,0,0,0.08); border-radius: 8px;
+    padding: 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-edit:active { background: #e5e5ea; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: white;
+    padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; z-index: 200;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .toast.show { opacity: 1; }
+
+  /* LOADER */
+  .loader {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -201,6 +347,70 @@
     <div class="empty-state">No completed demos yet today.</div>
   </div>
 </div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="editTitle">Edit Customer</div>
+    <div class="modal-sub" id="editSub">—</div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">From Location (optional)</div>
+      <input class="text-input" id="editFrom" placeholder="From location">
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Outcome</div>
+      <select class="text-input" id="editOutcome">
+        <option value="">— No outcome —</option>
+        <option value="Purchased">Purchased</option>
+        <option value="Buying later">Buying later</option>
+        <option value="Quotation">Quotation</option>
+        <option value="Courier to home">Courier to home</option>
+        <option value="Just visiting">Just visiting</option>
+        <option value="Wrong machine">Wrong machine</option>
+      </select>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Outcome Notes</div>
+      <textarea class="text-input" id="editNotes" placeholder="Notes"></textarea>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Machines Purchased (with material)</div>
+      <div class="multichips" id="editPurchaseChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Attachments Purchased</div>
+      <div class="multichips" id="editPurchaseAttChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
+    </div>
+
+    <div class="modal-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Returning customer?</span>
+        <div class="toggle" id="editReturningToggle" data-on="false"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Re-demo after billing?</span>
+        <div class="toggle" id="editRedemoToggle" data-on="false"></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancel">Cancel</button>
+      <button class="btn-primary" id="editSubmit">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
 
 <!-- PENDING FOLLOW-UP -->
 <div class="section">
@@ -280,6 +490,7 @@ async function init() {
   $('todayDate').textContent = fmtDate(new Date());
   renderHourlySkeleton();
   renderWeeklySkeleton();
+  await loadMachinesAndAttachments();
   await refreshAll();
   setStatus(true);
   setInterval(refreshAll, 15000);
@@ -388,6 +599,14 @@ function renderActive(visits) {
 }
 
 // COMPLETED CUSTOMER INFO — full details per customer
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  } catch(e) { return '—'; }
+}
+
 function renderCompleted(visits) {
   const list = $('completedList');
   const today = serverToday || new Date().toISOString().substring(0,10);
@@ -401,22 +620,213 @@ function renderCompleted(visits) {
     const purchChips = (v.machinesPurchased || '').split(',').filter(Boolean).map(p => `<span class="chip green">${p.trim()}</span>`).join(' ');
     const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
     const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
-    const waitStr = v.waitMinutes ? ` (waited ${v.waitMinutes}m)` : '';
+    const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip purple">Returning</span>` : '';
+    const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
+    const ob = outcomeBadge(v.outcome);
+    // Stash visit data on the element for the edit handler
+    const dataAttr = `data-visit='${JSON.stringify(v).replace(/'/g, "&#39;")}'`;
     return `
-      <div class="visit-card completed">
+      <div class="visit-card completed" id="completed-${v.rowId}">
         <div class="visit-head">
           <div class="visit-num">Customer ${v.customerNum}</div>
-          <div style="font-size:11px;color:#6c6c70;font-weight:700;">${fmtElapsed(v.demoMinutes || 0)}${waitStr}</div>
+          <span class="outcome-badge ${ob.cls}">${ob.text}</span>
         </div>
         <div class="visit-row"><strong>From:</strong> ${v.fromLocation || '—'} ${retBadge}</div>
+        <div class="visit-row"><strong>Time:</strong> ${fmtTime(v.startTime)} – ${fmtTime(v.endTime)} (${fmtElapsed(v.demoMinutes || 0)})</div>
+        <div class="visit-row"><strong>Wait:</strong> ${waitStr}</div>
         <div class="visit-row"><strong>Demoed:</strong> ${demoChips || '—'}</div>
         ${purchChips ? `<div class="visit-row"><strong>Bought:</strong> ${purchChips}</div>` : ''}
         ${attChips ? `<div class="visit-row"><strong>Attach:</strong> ${attChips}</div>` : ''}
+        ${redemoBadge ? `<div class="visit-row">${redemoBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;">"${v.outcomeNotes}"</div>` : ''}
+        <button class="btn-edit" onclick='openEdit(${v.rowId})'>Edit</button>
       </div>`;
   }).join('');
 }
+
+// outcome badge helper (needed for completed cards)
+function outcomeBadge(outcome) {
+  if (!outcome) return { cls: 'ob-empty', text: 'No outcome' };
+  const map = {
+    'purchased': { cls: 'ob-purchased', text: 'Bought' },
+    'buying later': { cls: 'ob-later', text: 'Later' },
+    'quotation': { cls: 'ob-quotation', text: 'Quote' },
+    'courier to home': { cls: 'ob-courier', text: 'Courier' },
+    'just visiting': { cls: 'ob-visiting', text: 'Visit' },
+    'wrong machine': { cls: 'ob-wrong', text: 'Wrong' }
+  };
+  return map[(outcome || '').toLowerCase()] || { cls: 'ob-empty', text: outcome };
+}
+
+// === EDIT MODAL ===
+let machines = [];
+let attachments = [];
+let editVisitData = null;
+let editPurchaseSet = new Set();      // selected machines (with material prefix, e.g. "SS-CIDM")
+let editPurchaseAttSet = new Set();
+
+async function loadMachinesAndAttachments() {
+  try {
+    const [m, a] = await Promise.all([apiGet('getmachines'), apiGet('getattachments')]);
+    machines = m.machines || [];
+    attachments = a.attachments || [];
+  } catch (e) { console.error('loadMachinesAndAttachments', e); }
+}
+
+async function apiPost(action, body) {
+  const r = await fetch(CONFIG.apiUrl + '?action=' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+function toast(msg, ms=1800) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+window.openEdit = async function(rowId) {
+  // Find the visit data
+  const today = serverToday || new Date().toISOString().substring(0,10);
+  const v = recentVisits.find(x => x.rowId === rowId && x.date === today);
+  if (!v) { toast('Visit not found'); return; }
+  editVisitData = v;
+
+  // Force-reload machines/attachments if empty
+  if (!machines.length || !attachments.length) await loadMachinesAndAttachments();
+
+  // Header
+  $('editTitle').textContent = 'Edit Customer ' + v.customerNum;
+  $('editSub').textContent = 'Demo: ' + fmtElapsed(v.demoMinutes || 0) +
+    (v.waitMinutes ? ' • Waited ' + v.waitMinutes + 'm' : '') +
+    ' • ' + fmtTime(v.startTime) + '–' + fmtTime(v.endTime);
+
+  // From
+  $('editFrom').value = v.fromLocation || '';
+
+  // Outcome
+  $('editOutcome').value = v.outcome || '';
+
+  // Notes
+  $('editNotes').value = v.outcomeNotes || '';
+
+  // Returning toggle
+  const retOn = v.returningCustomer === 'Yes';
+  $('editReturningToggle').dataset.on = retOn;
+  $('editReturningToggle').classList.toggle('on', retOn);
+
+  // Re-demo toggle
+  const redemoOn = v.reDemo && v.reDemo !== '';
+  $('editRedemoToggle').dataset.on = redemoOn;
+  $('editRedemoToggle').classList.toggle('on', redemoOn);
+
+  // Parse existing machines purchased: ["SS-CIDM", "MS-CSIM", ...] → for each machine, find prefix
+  const existingPurch = (v.machinesPurchased || '').split(',').filter(Boolean).map(s => s.trim());
+  editPurchaseSet = new Set(existingPurch);
+
+  // Render purchase chips with SS/MS toggle, pre-selecting existing
+  $('editPurchaseChips').innerHTML = machines.map(m => {
+    const ssSel = editPurchaseSet.has('SS-' + m);
+    const msSel = editPurchaseSet.has('MS-' + m);
+    const selected = ssSel || msSel;
+    const activeMat = msSel ? 'MS' : 'SS';
+    return `
+      <div class="multichip-with-toggle ${selected?'selected':''}" data-machine="${m}">
+        <span class="multichip-name">${m}</span>
+        <div class="toggle-ssms">
+          <div class="toggle-ssms-btn ${activeMat==='SS'?'active':''}" data-mat="SS">SS</div>
+          <div class="toggle-ssms-btn ${activeMat==='MS'?'active':''}" data-mat="MS">MS</div>
+        </div>
+      </div>`;
+  }).join('');
+  document.querySelectorAll('#editPurchaseChips .multichip-with-toggle').forEach(c => {
+    c.addEventListener('click', e => {
+      if (e.target.classList.contains('toggle-ssms-btn')) {
+        e.stopPropagation();
+        const sibs = c.querySelectorAll('.toggle-ssms-btn');
+        sibs.forEach(s => s.classList.remove('active'));
+        e.target.classList.add('active');
+        return;
+      }
+      const m = c.dataset.machine;
+      if (c.classList.contains('selected')) {
+        // Deselect — remove both SS- and MS- prefixes
+        editPurchaseSet.delete('SS-' + m);
+        editPurchaseSet.delete('MS-' + m);
+        c.classList.remove('selected');
+      } else {
+        // Select with current active material
+        const mat = c.querySelector('.toggle-ssms-btn.active').dataset.mat;
+        editPurchaseSet.add(mat + '-' + m);
+        c.classList.add('selected');
+      }
+    });
+  });
+
+  // Pre-select existing attachments purchased
+  editPurchaseAttSet = new Set((v.attachmentsPurchased || '').split(',').filter(Boolean).map(s => s.trim()));
+  $('editPurchaseAttChips').innerHTML = attachments.map(a => {
+    const sel = editPurchaseAttSet.has(a);
+    return `<div class="multichip ${sel?'selected':''}" data-att="${a}">${a}</div>`;
+  }).join('');
+  document.querySelectorAll('#editPurchaseAttChips .multichip').forEach(c => {
+    c.addEventListener('click', () => {
+      const a = c.dataset.att;
+      if (editPurchaseAttSet.has(a)) { editPurchaseAttSet.delete(a); c.classList.remove('selected'); }
+      else { editPurchaseAttSet.add(a); c.classList.add('selected'); }
+    });
+  });
+
+  $('editModal').classList.add('visible');
+};
+
+// Toggle handlers
+$('editReturningToggle').addEventListener('click', e => {
+  const t = e.currentTarget;
+  const on = t.dataset.on === 'true';
+  t.dataset.on = !on;
+  t.classList.toggle('on', !on);
+});
+$('editRedemoToggle').addEventListener('click', e => {
+  const t = e.currentTarget;
+  const on = t.dataset.on === 'true';
+  t.dataset.on = !on;
+  t.classList.toggle('on', !on);
+});
+
+$('editCancel').addEventListener('click', () => $('editModal').classList.remove('visible'));
+
+$('editSubmit').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  if (!editVisitData) return;
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
+
+  // Build payload — only fields that may need editing
+  const payload = {
+    rowId: editVisitData.rowId,
+    fromLocation: $('editFrom').value.trim(),
+    outcome: $('editOutcome').value,
+    outcomeNotes: $('editNotes').value.trim(),
+    machinesPurchased: Array.from(editPurchaseSet),
+    attachmentsPurchased: Array.from(editPurchaseAttSet),
+    returningCustomer: $('editReturningToggle').dataset.on === 'true' ? 'Yes' : 'No',
+    reDemoAfterBilling: $('editRedemoToggle').dataset.on === 'true' ? 'Yes' : 'No'
+  };
+
+  try {
+    const r = await apiPost('updatevisit', payload);
+    if (r.status === 'success') {
+      toast('Saved ✓');
+      $('editModal').classList.remove('visible');
+      await refreshAll();
+    } else { toast(r.message || 'Failed'); }
+  } catch (err) { toast('Error: ' + err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
+});
 
 // PENDING FOLLOW-UP — customers with outcome "Buying later"
 function renderPending(visits) {

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>KM Demo Tracker — Launcher</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1c1c1e; min-height: 100vh; overflow-x: hidden;
+    -webkit-user-select: none; user-select: none;
+    position: relative; z-index: 0;
+  }
+  #bg-image {
+    position: fixed; inset: 0; z-index: -2;
+    background: url('https://raw.githubusercontent.com/arun6a/production-line-system/main/Background.jpg') center/cover no-repeat;
+  }
+  #bg-overlay {
+    position: fixed; inset: 0; z-index: -1;
+    background: rgba(255, 255, 255, 0.4);
+  }
+
+  #boot-screen {
+    display: flex; flex-direction: column; min-height: 100vh;
+    padding: 35px 20px 25px;
+    padding-top: max(35px, env(safe-area-inset-top));
+    padding-bottom: max(25px, env(safe-area-inset-bottom));
+    position: relative; z-index: 1;
+    animation: fadeInUp 0.5s ease;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .boot-header { text-align: center; margin-bottom: 28px; }
+  .boot-logo {
+    width: 80px; height: auto; margin: 0 auto 10px; display: block;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    animation: logoFloat 3s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  .boot-title {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.5px;
+    color: #1c1c1e; margin-bottom: 4px;
+  }
+  .boot-subtitle {
+    font-size: 12px; color: #1a1a1a; font-weight: 700;
+    max-width: 300px; margin: 0 auto; line-height: 1.5;
+  }
+
+  /* APP CARDS */
+  .app-list {
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 440px; margin: 0 auto; width: 100%;
+  }
+  .app-card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px; padding: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    text-decoration: none; color: inherit;
+  }
+  .app-card:active {
+    transform: scale(0.97);
+    border-color: var(--accent);
+    box-shadow: 0 4px 20px var(--accent-bg);
+  }
+  .app-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; color: white; font-weight: 800;
+  }
+  .app-icon.staff { background: linear-gradient(135deg, #007aff 0%, #0066d6 100%); }
+  .app-icon.owner { background: linear-gradient(135deg, #ff6b35 0%, #e85f2e 100%); }
+  .app-info { flex: 1; min-width: 0; }
+  .app-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 2px; }
+  .app-desc { font-size: 12px; color: #6c6c70; font-weight: 600; line-height: 1.4; }
+
+  /* BOTTOM INFO */
+  .boot-footer {
+    text-align: center; margin-top: auto; padding-top: 30px;
+    font-size: 11px; color: #6c6c70; font-weight: 700;
+  }
+  .boot-footer strong { color: #1c1c1e; }
+
+  /* iframe view (hidden until app clicked) */
+  #app-view {
+    position: fixed; inset: 0; z-index: 50;
+    background: white;
+    display: none;
+    flex-direction: column;
+  }
+  #app-view.visible { display: flex; }
+  .app-header {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 10px 16px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    display: flex; align-items: center; gap: 10px;
+  }
+  .back-btn {
+    background: #f1f1f4; border: none;
+    border-radius: 20px; padding: 8px 12px;
+    font-size: 13px; font-weight: 700; color: #1c1c1e;
+    cursor: pointer;
+  }
+  .back-btn:active { background: #e5e5ea; }
+  .app-title-bar { font-size: 14px; font-weight: 700; flex: 1; }
+  iframe.app-frame { flex: 1; width: 100%; border: none; }
+</style>
+</head>
+<body>
+<div id="bg-image"></div>
+<div id="bg-overlay"></div>
+
+<!-- BOOT SCREEN (app picker) -->
+<div id="boot-screen">
+  <div class="boot-header">
+    <img class="boot-logo" src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" alt="KM">
+    <div class="boot-title">KM Demo Tracker</div>
+    <div class="boot-subtitle">Customer demo visit management system</div>
+  </div>
+
+  <div class="app-list">
+    <a class="app-card" id="openStaff">
+      <div class="app-icon staff">S</div>
+      <div class="app-info">
+        <div class="app-name">Demo Staff App</div>
+        <div class="app-desc">Check in customers, run demo timers, record outcomes</div>
+      </div>
+    </a>
+    <a class="app-card" id="openOwner">
+      <div class="app-icon owner">O</div>
+      <div class="app-info">
+        <div class="app-name">Owner Dashboard</div>
+        <div class="app-desc">Live demos, today's metrics, 7-day trends</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="boot-footer">
+    <strong>KM Production Line</strong> · Salem, Tamil Nadu
+  </div>
+</div>
+
+<!-- APP VIEW (iframe holder) -->
+<div id="app-view">
+  <div class="app-header">
+    <button class="back-btn" id="backBtn">← Back</button>
+    <div class="app-title-bar" id="appTitleBar">App</div>
+  </div>
+  <iframe class="app-frame" id="appFrame" src="about:blank"></iframe>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+// These are GitHub raw URLs for the two app HTML files
+const APPS = {
+  staff: {
+    title: 'Demo Staff App',
+    url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/demo-staff-app.html'
+  },
+  owner: {
+    title: 'Owner Dashboard',
+    url: 'https://raw.githubusercontent.com/arun6a/production-line-system/main/demo-owner-dashboard.html'
+  }
+};
+
+function openApp(key) {
+  const app = APPS[key];
+  if (!app) return;
+  document.getElementById('appTitleBar').textContent = app.title;
+  document.getElementById('appFrame').src = app.url;
+  document.getElementById('app-view').classList.add('visible');
+}
+
+document.getElementById('openStaff').addEventListener('click', e => {
+  e.preventDefault(); openApp('staff');
+});
+document.getElementById('openOwner').addEventListener('click', e => {
+  e.preventDefault(); openApp('owner');
+});
+document.getElementById('backBtn').addEventListener('click', () => {
+  document.getElementById('app-view').classList.remove('visible');
+  document.getElementById('appFrame').src = 'about:blank';
+});
+</script>
+</body>
+</html>

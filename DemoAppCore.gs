@@ -507,79 +507,170 @@ function saveDailyNotes(data) {
   }
 }
 
+// ==================== DIAGNOSTIC (RUN FIRST) ====================
+// Run testConnection() BEFORE setupSheet() to verify:
+//   1) The script has been authorized
+//   2) The SHEET_ID is correct and accessible
+// Returns a clear message you can read in the Execution Log.
+
+function testConnection() {
+  Logger.log('--- testConnection START ---');
+  Logger.log('SHEET_ID = ' + SHEET_ID);
+
+  let ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEET_ID);
+    Logger.log('✓ openById OK — sheet name: "' + ss.getName() + '"');
+    Logger.log('  URL: ' + ss.getUrl());
+  } catch (e) {
+    Logger.log('✗ openById FAILED: ' + e.toString());
+    Logger.log('  → Check SHEET_ID, or that your account owns the sheet.');
+    return 'FAIL: cannot open spreadsheet — ' + e.toString();
+  }
+
+  let sheets;
+  try {
+    sheets = ss.getSheets();
+    Logger.log('✓ getSheets OK — count: ' + sheets.length);
+    sheets.forEach(function (s) {
+      Logger.log('  - ' + s.getName() + ' (rows: ' + s.getLastRow() + ')');
+    });
+  } catch (e) {
+    Logger.log('✗ getSheets FAILED: ' + e.toString());
+    return 'FAIL: cannot list sheets — ' + e.toString();
+  }
+
+  Logger.log('--- testConnection OK ---');
+  return 'OK: spreadsheet accessible. ' + sheets.length + ' sheets present. Now run setupSheet().';
+}
+
 // ==================== ONE-TIME SETUP ====================
+// Defensive version — each step wrapped in try-catch with explicit logging,
+// so if one step fails you see exactly which one in the Execution Log
+// instead of Google's generic "unknown error".
 
 function setupSheet() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  Logger.log('=== setupSheet START ===');
 
-  // 1. DemoLog tab
-  let logSheet = ss.getSheetByName(TABS.DEMO_LOG);
-  if (!logSheet) {
-    logSheet = ss.insertSheet(TABS.DEMO_LOG);
-  } else {
-    logSheet.clearContents();
-  }
-  const logHeaders = ['Date', 'CustomerNum', 'FromLocation', 'MachinesDemoed', 'AttachmentsDemoed', 'StartTime', 'EndTime', 'DemoMinutes', 'Outcome', 'OutcomeNotes', 'MachinesPurchased', 'AttachmentsPurchased', 'ReturningCustomer', 'ReDemoAfterBilling'];
-  logSheet.getRange(1, 1, 1, logHeaders.length).setValues([logHeaders]);
-  logSheet.getRange(1, 1, 1, logHeaders.length).setFontWeight('bold');
-  logSheet.setFrozenRows(1);
-  for (let i = 1; i <= logHeaders.length; i++) logSheet.autoResizeColumn(i);
-
-  // 2. MachineList tab
-  let machSheet = ss.getSheetByName(TABS.MACHINES);
-  if (!machSheet) {
-    machSheet = ss.insertSheet(TABS.MACHINES);
-  } else {
-    machSheet.clearContents();
-  }
-  machSheet.getRange(1, 1, 1, 2).setValues([['model_name', 'status']]);
-  machSheet.getRange(1, 1, 1, 2).setFontWeight('bold');
-  const defaultMachines = ['CIDM', 'CSEM', 'CSIM', 'CCBM', 'CIDM110', 'AIDM'];
-  defaultMachines.forEach(m => machSheet.appendRow([m, 'active']));
-  machSheet.autoResizeColumn(1);
-  machSheet.autoResizeColumn(2);
-
-  // 3. AttachmentRegistry tab
-  let attSheet = ss.getSheetByName(TABS.ATTACHMENTS);
-  if (!attSheet) {
-    attSheet = ss.insertSheet(TABS.ATTACHMENTS);
-  } else {
-    attSheet.clearContents();
-  }
-  attSheet.getRange(1, 1, 1, 3).setValues([['attachment_id', 'attachment_name', 'status']]);
-  attSheet.getRange(1, 1, 1, 3).setFontWeight('bold');
-  attSheet.appendRow(['ATT-001', 'Muruku', 'active']);
-  attSheet.appendRow(['ATT-002', 'Porota', 'active']);
-  attSheet.autoResizeColumn(1);
-  attSheet.autoResizeColumn(2);
-  attSheet.autoResizeColumn(3);
-
-  // 4. DailyNotes tab
-  let notesSheet = ss.getSheetByName(TABS.DAILY_NOTES);
-  if (!notesSheet) {
-    notesSheet = ss.insertSheet(TABS.DAILY_NOTES);
-  } else {
-    notesSheet.clearContents();
-  }
-  notesSheet.getRange(1, 1, 1, 2).setValues([['Date', 'OtherWorkNotes']]);
-  notesSheet.getRange(1, 1, 1, 2).setFontWeight('bold');
-  notesSheet.autoResizeColumn(1);
-  notesSheet.autoResizeColumn(2);
-
-  // Delete default "Sheet1" if empty
-  const sheet1 = ss.getSheetByName('Sheet1');
-  if (sheet1 && sheet1.getLastRow() <= 1) {
-    ss.deleteSheet(sheet1);
+  // ---- Step 0: open the spreadsheet ----
+  let ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEET_ID);
+    Logger.log('[0] Opened spreadsheet: ' + ss.getName());
+  } catch (e) {
+    Logger.log('[0] FAILED to open spreadsheet: ' + e.toString());
+    throw new Error('Cannot open spreadsheet. Run testConnection() first. Details: ' + e.toString());
   }
 
-  Logger.log('=== Setup Complete ===');
-  Logger.log('Sheet: ' + ss.getUrl());
-  Logger.log('Tabs: ' + TABS.DEMO_LOG + ', ' + TABS.MACHINES + ', ' + TABS.ATTACHMENTS + ', ' + TABS.DAILY_NOTES);
+  // Helper: ensure a tab exists; if it exists, just clear it
+  function ensureTab(name, headers, nCols) {
+    let sh = ss.getSheetByName(name);
+    if (!sh) {
+      sh = ss.insertSheet(name);
+      Logger.log('  [+] Created new tab: ' + name);
+    } else {
+      sh.clearContents();
+      Logger.log('  [~] Cleared existing tab: ' + name);
+    }
+    sh.getRange(1, 1, 1, nCols).setValues([headers]);
+    sh.getRange(1, 1, 1, nCols).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    return sh;
+  }
+
+  // ---- Step 1: DemoLog ----
+  try {
+    Logger.log('[1] Setting up DemoLog...');
+    const logHeaders = ['Date', 'CustomerNum', 'FromLocation', 'MachinesDemoed',
+      'AttachmentsDemoed', 'StartTime', 'EndTime', 'DemoMinutes', 'Outcome',
+      'OutcomeNotes', 'MachinesPurchased', 'AttachmentsPurchased',
+      'ReturningCustomer', 'ReDemoAfterBilling'];
+    const logSheet = ensureTab(TABS.DEMO_LOG, logHeaders, logHeaders.length);
+    for (let i = 1; i <= logHeaders.length; i++) logSheet.autoResizeColumn(i);
+    Logger.log('[1] OK — DemoLog ready');
+  } catch (e) {
+    Logger.log('[1] FAILED — DemoLog: ' + e.toString());
+    throw e;
+  }
+
+  // ---- Step 2: MachineList ----
+  try {
+    Logger.log('[2] Setting up MachineList...');
+    const machHeaders = ['model_name', 'status'];
+    const machSheet = ensureTab(TABS.MACHINES, machHeaders, 2);
+    const defaultMachines = ['CIDM', 'CSEM', 'CSIM', 'CCBM', 'CIDM110', 'AIDM'];
+    defaultMachines.forEach(function (m) { machSheet.appendRow([m, 'active']); });
+    machSheet.autoResizeColumn(1);
+    machSheet.autoResizeColumn(2);
+    Logger.log('[2] OK — MachineList ready (6 default machines)');
+  } catch (e) {
+    Logger.log('[2] FAILED — MachineList: ' + e.toString());
+    throw e;
+  }
+
+  // ---- Step 3: AttachmentRegistry ----
+  try {
+    Logger.log('[3] Setting up AttachmentRegistry...');
+    const attHeaders = ['attachment_id', 'attachment_name', 'status'];
+    const attSheet = ensureTab(TABS.ATTACHMENTS, attHeaders, 3);
+    attSheet.appendRow(['ATT-001', 'Muruku', 'active']);
+    attSheet.appendRow(['ATT-002', 'Porota', 'active']);
+    attSheet.autoResizeColumn(1);
+    attSheet.autoResizeColumn(2);
+    attSheet.autoResizeColumn(3);
+    Logger.log('[3] OK — AttachmentRegistry ready (2 default attachments)');
+  } catch (e) {
+    Logger.log('[3] FAILED — AttachmentRegistry: ' + e.toString());
+    throw e;
+  }
+
+  // ---- Step 4: DailyNotes ----
+  try {
+    Logger.log('[4] Setting up DailyNotes...');
+    const notesHeaders = ['Date', 'OtherWorkNotes'];
+    const notesSheet = ensureTab(TABS.DAILY_NOTES, notesHeaders, 2);
+    notesSheet.autoResizeColumn(1);
+    notesSheet.autoResizeColumn(2);
+    Logger.log('[4] OK — DailyNotes ready');
+  } catch (e) {
+    Logger.log('[4] FAILED — DailyNotes: ' + e.toString());
+    throw e;
+  }
+
+  // ---- Step 5: optionally remove the default empty "Sheet1" ----
+  // SAFE: only delete if Sheet1 exists, is empty, AND is NOT the only sheet
+  // AND is NOT the active sheet (Google rejects deleting the active sheet).
+  try {
+    Logger.log('[5] Checking for default Sheet1...');
+    const sheet1 = ss.getSheetByName('Sheet1');
+    const allSheets = ss.getSheets();
+    if (sheet1) {
+      const isEmpty = sheet1.getLastRow() <= 1 && sheet1.getLastColumn() <= 1;
+      const isOnlySheet = allSheets.length <= 1;
+      const isActive = ss.getActiveSheet().getSheetId() === sheet1.getSheetId();
+      Logger.log('  Sheet1 found. isEmpty=' + isEmpty + ' isOnlySheet=' + isOnlySheet + ' isActive=' + isActive);
+      if (isEmpty && !isOnlySheet && !isActive) {
+        ss.deleteSheet(sheet1);
+        Logger.log('  [−] Deleted empty default Sheet1');
+      } else {
+        Logger.log('  [skip] Left Sheet1 in place (not safe to delete)');
+      }
+    } else {
+      Logger.log('  No Sheet1 present — nothing to clean up');
+    }
+  } catch (e) {
+    Logger.log('[5] Non-fatal — Sheet1 cleanup skipped: ' + e.toString());
+  }
+
+  Logger.log('=== setupSheet COMPLETE ===');
+  Logger.log('Sheet URL: ' + ss.getUrl());
+  Logger.log('Tabs created: ' + TABS.DEMO_LOG + ', ' + TABS.MACHINES + ', ' + TABS.ATTACHMENTS + ', ' + TABS.DAILY_NOTES);
   Logger.log('');
-  Logger.log('Now deploy as Web App:');
-  Logger.log('  Deploy → New deployment → Web app');
+  Logger.log('NEXT: Deploy → New deployment → Web app');
   Logger.log('  Execute as: Me');
   Logger.log('  Who has access: Anyone');
+
+  return 'Setup complete. 4 tabs ready. Check the Execution Log for details.';
 }
 
 // ==================== UTILITIES ====================

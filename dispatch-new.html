@@ -258,21 +258,10 @@ function isKnownSerial(serial) {
         // --- SYNC LOGIC ---
         let _syncRunning = false;
         async function runSync() {
-            if (_syncRunning) return; // prevent concurrent syncs
+            if (_syncRunning) { console.log('Sync already running, skipping'); return; }
             _syncRunning = true;
             const btn = document.getElementById('sync-btn');
             if (btn) btn.innerText = "...";
-            
-            // Helper: always hide loading screen + reset button
-            function finishSync() {
-                const loader = document.getElementById('loading-screen');
-                const mainContainer = document.getElementById('main-container');
-                if (loader) { loader.classList.add('fade-out'); }
-                if (mainContainer) { mainContainer.classList.add('visible'); }
-                setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
-                if (btn) btn.innerText = "🔄";
-                renderHistory(); // Always render history (from localStorage)
-            }
             
             try {
                 const res = await fetch(CSV_URL + '&t=' + Date.now());
@@ -287,8 +276,16 @@ function isKnownSerial(serial) {
                 if (!html5QrCode) startScanner(); 
             }
             
-            // ALWAYS hide loading screen + reset button + render history
-            finishSync();
+            // ALWAYS finish — wrapped in try-catch so _syncRunning always resets
+            try {
+                const loader = document.getElementById('loading-screen');
+                const mainContainer = document.getElementById('main-container');
+                if (loader) { loader.classList.add('fade-out'); }
+                if (mainContainer) { mainContainer.classList.add('visible'); }
+                setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
+                if (btn) btn.innerText = "🔄";
+                renderHistory();
+            } catch(e) { console.error('finishSync error:', e); }
             _syncRunning = false;
         }
 

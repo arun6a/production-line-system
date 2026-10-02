@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="KM Demo">
+<meta name="theme-color" content="#007aff">
+<title>KM Demo Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: white;
+    overflow: hidden;
+    background: linear-gradient(135deg, #007aff 0%, #0066d6 100%);
+    min-height: 100vh;
+  }
+
+  /* === LOADING SCREEN === */
+  #loader {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    padding: 20px;
+    transition: opacity 0.3s ease;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  .loader-logo {
+    width: 90px; height: 90px; border-radius: 22px; object-fit: cover;
+    margin-bottom: 24px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    animation: logoPulse 2s ease-in-out infinite;
+  }
+  @keyframes logoPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  .loader-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .loader-sub { font-size: 11px; opacity: 0.8; margin-bottom: 24px; }
+  .loader-spinner {
+    width: 38px; height: 38px;
+    border: 3px solid rgba(255,255,255,0.25);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-status { font-size: 13px; font-weight: 600; opacity: 0.95; text-align: center; max-width: 280px; }
+  .loader-progress { font-size: 11px; opacity: 0.7; margin-top: 8px; }
+  .loader-error {
+    background: rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 16px;
+    font-size: 12px;
+    max-width: 320px;
+    text-align: center;
+  }
+  .loader-retry-btn {
+    background: white; color: #007aff;
+    border: none; border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px; font-weight: 700;
+    margin-top: 14px; cursor: pointer;
+  }
+  .loader-retry-btn:active { transform: scale(0.97); }
+
+  /* === HIDDEN IFRAME THAT HOSTS THE ACTUAL APP === */
+  #appFrame {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    border: none;
+    background: #f5f5f7;
+    z-index: 1;
+  }
+
+  /* === UPDATE PROMPT (bottom slide-up) === */
+  #updatePrompt {
+    position: fixed; bottom: 16px; left: 16px; right: 16px;
+    background: rgba(0,0,0,0.88);
+    color: white;
+    padding: 14px 16px;
+    border-radius: 14px;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s ease;
+  }
+  #updatePrompt.show { display: block; }
+  @keyframes slideUp { from { transform: translateY(120%); } to { transform: translateY(0); } }
+  .update-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .update-text { font-size: 11.5px; opacity: 0.85; margin-bottom: 10px; }
+  .update-btn {
+    background: #34c759; color: white;
+    border: none; border-radius: 8px;
+    padding: 10px 16px; font-size: 13px; font-weight: 700;
+    cursor: pointer; margin-right: 8px;
+  }
+  .update-btn:active { transform: scale(0.97); background: #2da84c; }
+  .update-dismiss {
+    background: transparent; color: white;
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
+    padding: 9px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .update-dismiss:active { background: rgba(255,255,255,0.1); }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN (shown until app is loaded into iframe) -->
+<div id="loader">
+  <img class="loader-logo" src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" alt="KM">
+  <div class="loader-title">KM Demo Tracker</div>
+  <div class="loader-sub">Customer demo visit system</div>
+  <div class="loader-spinner" id="loaderSpinner"></div>
+  <div class="loader-status" id="loaderStatus">Starting...</div>
+  <div class="loader-progress" id="loaderProgress"></div>
+</div>
+
+<!-- HIDDEN IFRAME that hosts the actual app HTML -->
+<iframe id="appFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+
+<!-- UPDATE PROMPT (shown when a new version is available) -->
+<div id="updatePrompt">
+  <div class="update-title">Update Available</div>
+  <div class="update-text">A new version of the app was downloaded. Reload to use it.</div>
+  <button class="update-btn" id="updateApplyBtn">Reload Now</button>
+  <button class="update-dismiss" id="updateDismissBtn">Later</button>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const APP_URL = 'https://raw.githubusercontent.com/arun6a/production-line-system/main/demo-app.html';
+const CACHE_KEY = 'km_demo_app_html_v1';
+const CACHE_TIME_KEY = 'km_demo_app_time_v1';
+const CACHE_HASH_KEY = 'km_demo_app_hash_v1';
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000;  // check for updates every 30 min while app runs
+const FRESH_CACHE_MS = 2 * 60 * 60 * 1000;   // 2 hours — if cache younger, don't bother re-fetching on launch
+
+function setStatus(msg, progress) {
+  document.getElementById('loaderStatus').textContent = msg;
+  if (progress !== undefined) {
+    document.getElementById('loaderProgress').textContent = progress;
+  }
+}
+
+function hideLoader() {
+  const loader = document.getElementById('loader');
+  loader.classList.add('hide');
+  setTimeout(() => loader.style.display = 'none', 400);
+}
+
+function showError(msg) {
+  const loader = document.getElementById('loader');
+  const html = `
+    <img class="loader-logo" src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" alt="KM">
+    <div class="loader-title">KM Demo Tracker</div>
+    <div class="loader-sub">Connection error</div>
+    <div class="loader-error">${msg}</div>
+    <button class="loader-retry-btn" onclick="location.reload()">Retry</button>
+  `;
+  loader.innerHTML = html;
+}
+
+function loadIntoFrame(html) {
+  const frame = document.getElementById('appFrame');
+  frame.srcdoc = html;
+}
+
+function setCache(html) {
+  try {
+    localStorage.setItem(CACHE_KEY, html);
+    localStorage.setItem(CACHE_TIME_KEY, String(Date.now()));
+    // Simple hash for quick comparison
+    let hash = 0;
+    for (let i = 0; i < html.length; i++) {
+      hash = ((hash << 5) - hash + html.charCodeAt(i)) | 0;
+    }
+    localStorage.setItem(CACHE_HASH_KEY, String(hash));
+  } catch (e) {
+    // localStorage may be full (HTML is large) — fall back to no cache
+    console.warn('Cannot cache HTML:', e);
+  }
+}
+
+function getCachedHtml() {
+  try { return localStorage.getItem(CACHE_KEY) || null; }
+  catch (e) { return null; }
+}
+
+function getCachedTime() {
+  try { return parseInt(localStorage.getItem(CACHE_TIME_KEY) || '0'); }
+  catch (e) { return 0; }
+}
+
+function getCachedHash() {
+  try { return localStorage.getItem(CACHE_HASH_KEY) || null; }
+  catch (e) { return null; }
+}
+
+// Simple hash for comparison (matches setCache logic)
+function hashHtml(html) {
+  let hash = 0;
+  for (let i = 0; i < html.length; i++) {
+    hash = ((hash << 5) - hash + html.charCodeAt(i)) | 0;
+  }
+  return String(hash);
+}
+
+async function fetchAppHtml() {
+  const url = APP_URL + '?t=' + Date.now();  // cache-busting
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.text();
+}
+
+// ==================== MAIN LAUNCH FLOW ====================
+async function launch() {
+  const cached = getCachedHtml();
+  const cacheTime = getCachedTime();
+  const now = Date.now();
+  const cacheAge = now - cacheTime;
+
+  if (cached) {
+    // === We have a cached version — show it instantly ===
+    setStatus('Opening app...', '');
+    loadIntoFrame(cached);
+    // Wait a beat for the iframe to start rendering, then hide loader
+    setTimeout(hideLoader, 400);
+
+    // Background check for update (only if cache is older than FRESH_CACHE_MS)
+    if (cacheAge > FRESH_CACHE_MS) {
+      setTimeout(checkForUpdate, 2000);
+    } else {
+      // Cache is fresh — still schedule a periodic check
+      setTimeout(checkForUpdate, REFRESH_INTERVAL_MS);
+    }
+  } else {
+    // === No cache — must download on launch ===
+    setStatus('Downloading app...', Math.round(0) + '%');
+    try {
+      const html = await fetchAppHtml();
+      setStatus('Loading app...', '');
+      setCache(html);
+      loadIntoFrame(html);
+      setTimeout(hideLoader, 400);
+      // Schedule periodic update check
+      setTimeout(checkForUpdate, REFRESH_INTERVAL_MS);
+    } catch (e) {
+      console.error('Launch failed:', e);
+      showError('Cannot download the app. Please check your internet connection and try again.<br><br>Error: ' + e.message);
+    }
+  }
+}
+
+// ==================== UPDATE CHECK ====================
+async function checkForUpdate() {
+  try {
+    const freshHtml = await fetchAppHtml();
+    const freshHash = hashHtml(freshHtml);
+    const cachedHash = getCachedHash();
+
+    if (freshHash !== cachedHash) {
+      // Update available — cache it and prompt user
+      setCache(freshHtml);
+      showUpdatePrompt();
+    } else {
+      // Same — refresh cache time
+      try { localStorage.setItem(CACHE_TIME_KEY, String(Date.now())); } catch (e) {}
+      // Schedule next check
+      setTimeout(checkForUpdate, REFRESH_INTERVAL_MS);
+    }
+  } catch (e) {
+    // Network failure — silent, app still works from cache
+    console.warn('Update check failed:', e);
+    setTimeout(checkForUpdate, REFRESH_INTERVAL_MS);
+  }
+}
+
+function showUpdatePrompt() {
+  document.getElementById('updatePrompt').classList.add('show');
+}
+
+document.getElementById('updateApplyBtn').addEventListener('click', () => {
+  document.getElementById('updatePrompt').classList.remove('show');
+  // Reload the iframe with the new cached HTML
+  const cached = getCachedHtml();
+  if (cached) {
+    loadIntoFrame(cached);
+  }
+});
+
+document.getElementById('updateDismissBtn').addEventListener('click', () => {
+  document.getElementById('updatePrompt').classList.remove('show');
+  // Schedule next check in 1 hour
+  setTimeout(checkForUpdate, 60 * 60 * 1000);
+});
+
+// ==================== GO ====================
+launch();
+</script>
+</body>
+</html>

@@ -286,8 +286,9 @@ function isKnownSerial(serial) {
                 if (!html5QrCode) startScanner(); 
             }
             
-            // ALWAYS hide loading screen + reset button — success or failure
+            // ALWAYS hide loading screen + reset button + render history — success or failure
             finishSync();
+            renderHistory(); // Show history from localStorage even if sync failed
         }
 
         function parseDispatch(text) {

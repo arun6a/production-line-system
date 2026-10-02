@@ -256,7 +256,10 @@ function isKnownSerial(serial) {
         }
 
         // --- SYNC LOGIC ---
+        let _syncRunning = false;
         async function runSync() {
+            if (_syncRunning) return; // prevent concurrent syncs
+            _syncRunning = true;
             const btn = document.getElementById('sync-btn');
             if (btn) btn.innerText = "...";
             
@@ -268,27 +271,25 @@ function isKnownSerial(serial) {
                 if (mainContainer) { mainContainer.classList.add('visible'); }
                 setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
                 if (btn) btn.innerText = "🔄";
+                renderHistory(); // Always render history (from localStorage)
             }
             
             try {
-                // Add 8-second timeout to prevent hanging forever
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 8000);
-                const res = await fetch(CSV_URL + '&t=' + Date.now(), { signal: controller.signal });
-                clearTimeout(timer);
-                const text = await res.text(); parseDispatch(text);
+                const res = await fetch(CSV_URL + '&t=' + Date.now());
+                const text = await res.text();
+                parseDispatch(text);
                 localStorage.setItem(LS_TIME, new Date().toLocaleTimeString());
                 document.getElementById('sync-time').innerText = localStorage.getItem(LS_TIME);
-                updateGoal(); renderHistory(); updatePendingUI(); handleSerialInput(); 
+                updateGoal(); updatePendingUI(); handleSerialInput(); 
                 if (!html5QrCode) startScanner();
             } catch (e) { 
                 console.error('Sync failed:', e);
                 if (!html5QrCode) startScanner(); 
             }
             
-            // ALWAYS hide loading screen + reset button + render history — success or failure
+            // ALWAYS hide loading screen + reset button + render history
             finishSync();
-            renderHistory(); // Show history from localStorage even if sync failed
+            _syncRunning = false;
         }
 
         function parseDispatch(text) {

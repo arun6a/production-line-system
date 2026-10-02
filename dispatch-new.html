@@ -217,6 +217,8 @@ function isKnownSerial(serial) {
         
         // CSV URL for fetching dispatch history (used for duplicate detection + recent history display)
         const CSV_URL = `https://docs.google.com/spreadsheets/d/15Kj3Dw073HjuK54uYOEq4kn-04SeSOUqHydgZetDphI/export?format=csv&gid=200741550`;
+        const WIRING_CSV_URL = `https://docs.google.com/spreadsheets/d/19y16Nu7GdYPN0DdTZId2bfoBn4jSmV5ZVHXSkdDdcRY/export?format=csv`;
+        let SERIAL_MAP = {}; // serial → full machine name (e.g., "SSKM2609001" → "SS CIDM")
         // =========================================
 
         let html5QrCode; let isTorchOn = false; let isZoomed = false;
@@ -267,6 +269,12 @@ function isKnownSerial(serial) {
                 const res = await fetch(CSV_URL + '&t=' + Date.now());
                 const text = await res.text();
                 parseDispatch(text);
+                // Also fetch wiring CSV to build serial→model map for full machine names
+                try {
+                    const wRes = await fetch(WIRING_CSV_URL + '&t=' + Date.now());
+                    const wText = await wRes.text();
+                    buildSerialMap(wText);
+                } catch(wErr) { console.warn('Wiring CSV fetch failed (non-critical):', wErr); }
                 localStorage.setItem(LS_TIME, new Date().toLocaleTimeString());
                 document.getElementById('sync-time').innerText = localStorage.getItem(LS_TIME);
                 updateGoal(); updatePendingUI(); handleSerialInput(); 
@@ -304,6 +312,34 @@ function isKnownSerial(serial) {
                 }
             }
             localStorage.setItem(LS_HIST, JSON.stringify(history));
+        }
+
+        // Build serial → full machine name map from wiring CSV
+        // e.g., "SSKM2609001" → "SS CIDM" (column header gives model, prefix gives SS/MS)
+        function buildSerialMap(text) {
+            const rows = text.split('\n');
+            if (rows.length < 2) return;
+            const rawHeaders = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
+            const ignoreExact = ['id', 's.no', 'sno', 'no', '#'];
+            const ignoreSubstrings = ['date', 'time', 'shift', 'operator', 'status', 'remark', 'note', 'total', 'count', 'day', 'name', 'model', 'serial', 'input', 'scan'];
+            const machineCols = {};
+            rawHeaders.forEach((h, idx) => {
+                if (!h) return;
+                const lh = h.toLowerCase();
+                if (ignoreExact.includes(lh) || ignoreSubstrings.some(k => lh.includes(k))) return;
+                machineCols[idx] = h;
+            });
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+                for (const [idx, modelName] of Object.entries(machineCols)) {
+                    const s = cells[idx] ? cells[idx].trim().toUpperCase() : "";
+                    if (looksLikeSerial(s)) {
+                        const prefix = getMaterialTypeFromSerial(s) || 'MS';
+                        SERIAL_MAP[s] = prefix + ' ' + modelName;
+                    }
+                }
+            }
+            console.log('Built SERIAL_MAP with', Object.keys(SERIAL_MAP).length, 'entries');
         }
 
         function startScanner() {
@@ -422,8 +458,8 @@ function isKnownSerial(serial) {
                 html += `<div style="margin-top:12px;margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.04);border-radius:8px;font-size:11px;font-weight:800;color:#8e8e93;text-transform:uppercase;letter-spacing:0.5px;">${date}</div>`;
                 grouped[date].forEach(i => {
                     const prefix = getMaterialTypeFromSerial(i.serial) || 'MS';
-                    // Dispatch app doesn't have wiring CSV map — use prefix + "Machine" as badge
-                    let fullName = prefix + ' Machine';
+                    // Look up full machine name from SERIAL_MAP (built from wiring CSV)
+                    let fullName = SERIAL_MAP[i.serial] || (prefix + ' Machine');
                     const color = getMachineColor(fullName);
                     const invoiceText = i.invoice ? `<span style="color:#8e8e93;font-size:11px;margin-left:6px;">#${i.invoice}</span>` : '';
                     html += `<div class="history-item"><span style="font-weight:600;"><span class="status-dot" style="background:${i.status==='pending'?'#ff9500':'#34c759'}"></span><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:${color};color:white;font-size:10px;font-weight:700;margin-right:6px;">${fullName}</span>${i.customer} <span style="opacity:0.6;font-size:11px">${i.serial.substring(0,14)}</span>${invoiceText}</span><span style="color:#8e8e93;font-size:12px">${i.status==='pending'?'⏳':''}</span></div>`;

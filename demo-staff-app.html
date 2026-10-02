@@ -68,6 +68,15 @@
   }
   .visit-card.waiting { border-left: 4px solid #ff9500; }
   .visit-card.active { border-left: 4px solid #007aff; }
+  .visit-card.completed { border-left: 4px solid #34c759; }
+  .btn-edit {
+    margin-top: 8px; width: 100%;
+    background: #f1f1f4; color: #1c1c1e;
+    border: 1px solid rgba(0,0,0,0.08); border-radius: 8px;
+    padding: 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-edit:active { background: #e5e5ea; }
   .visit-card-head {
     display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
   }
@@ -487,6 +496,67 @@
   </div>
 </div>
 
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="editTitle">Edit Customer</div>
+    <div class="modal-sub" id="editSub">—</div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">From Location (optional)</div>
+      <input class="text-input" id="editFrom" placeholder="From location">
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Outcome (optional)</div>
+      <select class="text-input" id="editOutcome">
+        <option value="">— No outcome —</option>
+        <option value="Purchased">Purchased</option>
+        <option value="Buying later">Buying later</option>
+        <option value="Quotation">Quotation</option>
+        <option value="Courier to home">Courier to home</option>
+        <option value="Just visiting">Just visiting</option>
+        <option value="Wrong machine">Wrong machine</option>
+      </select>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Outcome Notes</div>
+      <textarea class="text-input" id="editNotes" placeholder="Customer feedback / details"></textarea>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Machines Purchased (with material)</div>
+      <div class="multichips" id="editPurchaseChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-label">Attachments Purchased</div>
+      <div class="multichips" id="editPurchaseAttChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
+    </div>
+
+    <div class="modal-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Returning customer?</span>
+        <div class="toggle" id="editReturningToggle" data-on="false"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Re-demo after billing?</span>
+        <div class="toggle" id="editRedemoToggle" data-on="false"></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancel">Cancel</button>
+      <button class="btn-primary" id="editSubmit">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -498,6 +568,7 @@ const CONFIG = {
 let machines = [];
 let attachments = [];
 let serverToday = null;
+let recentVisits = [];
 let activeVisitRowId = null;
 let activeVisitStart = null;
 let checkoutData = { machines: new Set(), attachments: new Set(), additionalMachines: new Set(), additionalAttachments: new Set() };
@@ -588,10 +659,11 @@ async function refreshAll() {
     ]);
     if (summary.summary && summary.summary.today) serverToday = summary.summary.today;
     if (recent.today) serverToday = recent.today;
+    recentVisits = recent.visits || [];
     renderStats(summary.summary);
     renderWaiting(activeResp.waiting || []);
     renderActive(activeResp.active || []);
-    renderCompleted(recent.visits || []);
+    renderCompleted(recentVisits);
     loadDailyNotes();
     setStatus(true);
   } catch (e) {
@@ -660,6 +732,14 @@ function renderActive(visits) {
   }).join('');
 }
 
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  } catch(e) { return '—'; }
+}
+
 function renderCompleted(visits) {
   const list = $('completedList');
   const today = serverToday || new Date().toISOString().substring(0,10);
@@ -671,16 +751,27 @@ function renderCompleted(visits) {
   }
   list.innerHTML = todayCompleted.map(v => {
     const ob = outcomeBadge(v.outcome);
-    const purchStr = v.machinesPurchased || v.attachmentsPurchased;
-    const purchInfo = purchStr ? `Bought: ${[v.machinesPurchased, v.attachmentsPurchased].filter(Boolean).join(', ')}` : (v.machinesDemoed || 'no demos');
+    const purchChips = (v.machinesPurchased || '').split(',').filter(Boolean).map(p => `<span class="chip green" style="background:#d4f5dd;color:#166534;">${p.trim()}</span>`).join(' ');
+    const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
+    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
+    const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip returning">Returning</span>` : '';
+    const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
     return `
-      <div class="completed-row">
-        <div class="completed-num">Customer ${v.customerNum}</div>
-        <div class="completed-info">
-          ${v.fromLocation || '—'} • ${fmtElapsed(v.demoMinutes || 0)}
-          <div class="info-row">${purchInfo}</div>
+      <div class="visit-card completed">
+        <div class="visit-card-head">
+          <div class="visit-num">Customer ${v.customerNum}</div>
+          <span class="outcome-badge ${ob.cls}">${ob.text}</span>
         </div>
-        <span class="outcome-badge ${ob.cls}">${ob.text}</span>
+        <div class="visit-row"><span class="label">From:</span> ${v.fromLocation || '—'} ${retBadge}</div>
+        <div class="visit-row"><span class="label">Time:</span> ${fmtTime(v.startTime)} – ${fmtTime(v.endTime)} (${fmtElapsed(v.demoMinutes || 0)})</div>
+        <div class="visit-row"><span class="label">Wait:</span> ${waitStr}</div>
+        <div class="visit-row"><span class="label">Demoed:</span> <div class="chip-list">${demoChips || '<span style="color:#8c8c92;font-size:11px;">none</span>'}</div></div>
+        ${purchChips ? `<div class="visit-row"><span class="label">Bought:</span> <div class="chip-list">${purchChips}</div></div>` : ''}
+        ${attChips ? `<div class="visit-row"><span class="label">Attach:</span> <div class="chip-list">${attChips}</div></div>` : ''}
+        ${redemoBadge ? `<div style="margin-top:6px;">${redemoBadge}</div>` : ''}
+        ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;margin-top:4px;">"${v.outcomeNotes}"</div>` : ''}
+        <button class="btn-edit" onclick="openEdit(${v.rowId})">Edit</button>
       </div>`;
   }).join('');
 }
@@ -961,6 +1052,146 @@ $('checkoutSubmit').addEventListener('click', async (e) => {
     } else { toast(r.message || 'Failed'); }
   } catch (err) { toast('Error: ' + err.message); }
   finally { btn.disabled = false; btn.textContent = 'Submit Checkout'; }
+});
+
+// ====== EDIT MODAL (edit completed visit from staff app) ======
+let editVisitData = null;
+let editPurchaseSet = new Set();        // machines with material prefix, e.g. "SS-CIDM"
+let editPurchaseAttSet = new Set();
+
+window.openEdit = async function(rowId) {
+  // Find the visit in recentVisits
+  if (!recentVisits) {
+    // Fallback: fetch fresh
+    const r = await apiGet('getrecentvisits');
+    recentVisits = r.visits || [];
+    if (r.today) serverToday = r.today;
+  }
+  const today = serverToday || new Date().toISOString().substring(0,10);
+  const v = recentVisits.find(x => x.rowId === rowId && x.date === today);
+  if (!v) { toast('Visit not found'); return; }
+  editVisitData = v;
+
+  // Force-reload machines/attachments if empty
+  if (!machines.length || !attachments.length) await loadMachinesAndAttachments();
+
+  $('editTitle').textContent = 'Edit Customer ' + v.customerNum;
+  $('editSub').textContent = 'Demo: ' + fmtElapsed(v.demoMinutes || 0) +
+    (v.waitMinutes ? ' • Waited ' + v.waitMinutes + 'm' : '') +
+    ' • ' + fmtTime(v.startTime) + '–' + fmtTime(v.endTime);
+
+  $('editFrom').value = v.fromLocation || '';
+  $('editOutcome').value = v.outcome || '';
+  $('editNotes').value = v.outcomeNotes || '';
+
+  const retOn = v.returningCustomer === 'Yes';
+  $('editReturningToggle').dataset.on = retOn;
+  $('editReturningToggle').classList.toggle('on', retOn);
+
+  const redemoOn = v.reDemo && v.reDemo !== '';
+  $('editRedemoToggle').dataset.on = redemoOn;
+  $('editRedemoToggle').classList.toggle('on', redemoOn);
+
+  // Parse existing machines purchased → ["SS-CIDM", "MS-CSIM", ...]
+  const existingPurch = (v.machinesPurchased || '').split(',').filter(Boolean).map(s => s.trim());
+  editPurchaseSet = new Set(existingPurch);
+
+  // Render purchase chips with SS/MS toggle, pre-selecting existing
+  $('editPurchaseChips').innerHTML = machines.map(m => {
+    const ssSel = editPurchaseSet.has('SS-' + m);
+    const msSel = editPurchaseSet.has('MS-' + m);
+    const selected = ssSel || msSel;
+    const activeMat = msSel ? 'MS' : 'SS';
+    return `
+      <div class="multichip-with-toggle ${selected?'selected':''}" data-machine="${m}">
+        <span class="multichip-name">${m}</span>
+        <div class="toggle-ssms">
+          <div class="toggle-ssms-btn ${activeMat==='SS'?'active':''}" data-mat="SS">SS</div>
+          <div class="toggle-ssms-btn ${activeMat==='MS'?'active':''}" data-mat="MS">MS</div>
+        </div>
+      </div>`;
+  }).join('');
+  document.querySelectorAll('#editPurchaseChips .multichip-with-toggle').forEach(c => {
+    c.addEventListener('click', e => {
+      if (e.target.classList.contains('toggle-ssms-btn')) {
+        e.stopPropagation();
+        const sibs = c.querySelectorAll('.toggle-ssms-btn');
+        sibs.forEach(s => s.classList.remove('active'));
+        e.target.classList.add('active');
+        return;
+      }
+      const m = c.dataset.machine;
+      if (c.classList.contains('selected')) {
+        editPurchaseSet.delete('SS-' + m);
+        editPurchaseSet.delete('MS-' + m);
+        c.classList.remove('selected');
+      } else {
+        const mat = c.querySelector('.toggle-ssms-btn.active').dataset.mat;
+        editPurchaseSet.add(mat + '-' + m);
+        c.classList.add('selected');
+      }
+    });
+  });
+
+  // Pre-select existing attachments purchased
+  editPurchaseAttSet = new Set((v.attachmentsPurchased || '').split(',').filter(Boolean).map(s => s.trim()));
+  $('editPurchaseAttChips').innerHTML = attachments.map(a => {
+    const sel = editPurchaseAttSet.has(a);
+    return `<div class="multichip ${sel?'selected':''}" data-att="${a}">${a}</div>`;
+  }).join('');
+  document.querySelectorAll('#editPurchaseAttChips .multichip').forEach(c => {
+    c.addEventListener('click', () => {
+      const a = c.dataset.att;
+      if (editPurchaseAttSet.has(a)) { editPurchaseAttSet.delete(a); c.classList.remove('selected'); }
+      else { editPurchaseAttSet.add(a); c.classList.add('selected'); }
+    });
+  });
+
+  $('editModal').classList.add('visible');
+};
+
+// Toggle handlers
+$('editReturningToggle').addEventListener('click', e => {
+  const t = e.currentTarget;
+  const on = t.dataset.on === 'true';
+  t.dataset.on = !on;
+  t.classList.toggle('on', !on);
+});
+$('editRedemoToggle').addEventListener('click', e => {
+  const t = e.currentTarget;
+  const on = t.dataset.on === 'true';
+  t.dataset.on = !on;
+  t.classList.toggle('on', !on);
+});
+
+$('editCancel').addEventListener('click', () => $('editModal').classList.remove('visible'));
+
+$('editSubmit').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  if (!editVisitData) return;
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
+
+  const payload = {
+    rowId: editVisitData.rowId,
+    fromLocation: $('editFrom').value.trim(),
+    outcome: $('editOutcome').value,
+    outcomeNotes: $('editNotes').value.trim(),
+    machinesPurchased: Array.from(editPurchaseSet),
+    attachmentsPurchased: Array.from(editPurchaseAttSet),
+    returningCustomer: $('editReturningToggle').dataset.on === 'true' ? 'Yes' : 'No',
+    reDemoAfterBilling: $('editRedemoToggle').dataset.on === 'true' ? 'Yes' : 'No'
+  };
+
+  try {
+    const r = await apiPost('updatevisit', payload);
+    if (r.status === 'success') {
+      toast('Saved ✓');
+      $('editModal').classList.remove('visible');
+      await refreshAll();
+    } else { toast(r.message || 'Failed'); }
+  } catch (err) { toast('Error: ' + err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
 });
 
 // ====== DAILY NOTES ======

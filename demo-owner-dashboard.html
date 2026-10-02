@@ -348,70 +348,6 @@
   </div>
 </div>
 
-<!-- EDIT MODAL -->
-<div class="modal-overlay" id="editModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="editTitle">Edit Customer</div>
-    <div class="modal-sub" id="editSub">—</div>
-
-    <div class="modal-section">
-      <div class="modal-section-label">From Location (optional)</div>
-      <input class="text-input" id="editFrom" placeholder="From location">
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-label">Outcome</div>
-      <select class="text-input" id="editOutcome">
-        <option value="">— No outcome —</option>
-        <option value="Purchased">Purchased</option>
-        <option value="Buying later">Buying later</option>
-        <option value="Quotation">Quotation</option>
-        <option value="Courier to home">Courier to home</option>
-        <option value="Just visiting">Just visiting</option>
-        <option value="Wrong machine">Wrong machine</option>
-      </select>
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-label">Outcome Notes</div>
-      <textarea class="text-input" id="editNotes" placeholder="Notes"></textarea>
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-label">Machines Purchased (with material)</div>
-      <div class="multichips" id="editPurchaseChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-label">Attachments Purchased</div>
-      <div class="multichips" id="editPurchaseAttChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
-    </div>
-
-    <div class="modal-section">
-      <div class="toggle-row">
-        <span class="toggle-label">Returning customer?</span>
-        <div class="toggle" id="editReturningToggle" data-on="false"></div>
-      </div>
-    </div>
-
-    <div class="modal-section">
-      <div class="toggle-row">
-        <span class="toggle-label">Re-demo after billing?</span>
-        <div class="toggle" id="editRedemoToggle" data-on="false"></div>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn-cancel" id="editCancel">Cancel</button>
-      <button class="btn-primary" id="editSubmit">Save Changes</button>
-    </div>
-  </div>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
 <!-- PENDING FOLLOW-UP -->
 <div class="section">
   <div class="section-title">Pending Follow-Up (Buying Later) <small id="pendingCount">0</small></div>
@@ -490,7 +426,6 @@ async function init() {
   $('todayDate').textContent = fmtDate(new Date());
   renderHourlySkeleton();
   renderWeeklySkeleton();
-  await loadMachinesAndAttachments();
   await refreshAll();
   setStatus(true);
   setInterval(refreshAll, 15000);
@@ -624,8 +559,6 @@ function renderCompleted(visits) {
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip purple">Returning</span>` : '';
     const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
     const ob = outcomeBadge(v.outcome);
-    // Stash visit data on the element for the edit handler
-    const dataAttr = `data-visit='${JSON.stringify(v).replace(/'/g, "&#39;")}'`;
     return `
       <div class="visit-card completed" id="completed-${v.rowId}">
         <div class="visit-head">
@@ -640,7 +573,6 @@ function renderCompleted(visits) {
         ${attChips ? `<div class="visit-row"><strong>Attach:</strong> ${attChips}</div>` : ''}
         ${redemoBadge ? `<div class="visit-row">${redemoBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;">"${v.outcomeNotes}"</div>` : ''}
-        <button class="btn-edit" onclick='openEdit(${v.rowId})'>Edit</button>
       </div>`;
   }).join('');
 }
@@ -658,175 +590,6 @@ function outcomeBadge(outcome) {
   };
   return map[(outcome || '').toLowerCase()] || { cls: 'ob-empty', text: outcome };
 }
-
-// === EDIT MODAL ===
-let machines = [];
-let attachments = [];
-let editVisitData = null;
-let editPurchaseSet = new Set();      // selected machines (with material prefix, e.g. "SS-CIDM")
-let editPurchaseAttSet = new Set();
-
-async function loadMachinesAndAttachments() {
-  try {
-    const [m, a] = await Promise.all([apiGet('getmachines'), apiGet('getattachments')]);
-    machines = m.machines || [];
-    attachments = a.attachments || [];
-  } catch (e) { console.error('loadMachinesAndAttachments', e); }
-}
-
-async function apiPost(action, body) {
-  const r = await fetch(CONFIG.apiUrl + '?action=' + action, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body)
-  });
-  return r.json();
-}
-
-function toast(msg, ms=1800) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), ms);
-}
-
-window.openEdit = async function(rowId) {
-  // Find the visit data
-  const today = serverToday || new Date().toISOString().substring(0,10);
-  const v = recentVisits.find(x => x.rowId === rowId && x.date === today);
-  if (!v) { toast('Visit not found'); return; }
-  editVisitData = v;
-
-  // Force-reload machines/attachments if empty
-  if (!machines.length || !attachments.length) await loadMachinesAndAttachments();
-
-  // Header
-  $('editTitle').textContent = 'Edit Customer ' + v.customerNum;
-  $('editSub').textContent = 'Demo: ' + fmtElapsed(v.demoMinutes || 0) +
-    (v.waitMinutes ? ' • Waited ' + v.waitMinutes + 'm' : '') +
-    ' • ' + fmtTime(v.startTime) + '–' + fmtTime(v.endTime);
-
-  // From
-  $('editFrom').value = v.fromLocation || '';
-
-  // Outcome
-  $('editOutcome').value = v.outcome || '';
-
-  // Notes
-  $('editNotes').value = v.outcomeNotes || '';
-
-  // Returning toggle
-  const retOn = v.returningCustomer === 'Yes';
-  $('editReturningToggle').dataset.on = retOn;
-  $('editReturningToggle').classList.toggle('on', retOn);
-
-  // Re-demo toggle
-  const redemoOn = v.reDemo && v.reDemo !== '';
-  $('editRedemoToggle').dataset.on = redemoOn;
-  $('editRedemoToggle').classList.toggle('on', redemoOn);
-
-  // Parse existing machines purchased: ["SS-CIDM", "MS-CSIM", ...] → for each machine, find prefix
-  const existingPurch = (v.machinesPurchased || '').split(',').filter(Boolean).map(s => s.trim());
-  editPurchaseSet = new Set(existingPurch);
-
-  // Render purchase chips with SS/MS toggle, pre-selecting existing
-  $('editPurchaseChips').innerHTML = machines.map(m => {
-    const ssSel = editPurchaseSet.has('SS-' + m);
-    const msSel = editPurchaseSet.has('MS-' + m);
-    const selected = ssSel || msSel;
-    const activeMat = msSel ? 'MS' : 'SS';
-    return `
-      <div class="multichip-with-toggle ${selected?'selected':''}" data-machine="${m}">
-        <span class="multichip-name">${m}</span>
-        <div class="toggle-ssms">
-          <div class="toggle-ssms-btn ${activeMat==='SS'?'active':''}" data-mat="SS">SS</div>
-          <div class="toggle-ssms-btn ${activeMat==='MS'?'active':''}" data-mat="MS">MS</div>
-        </div>
-      </div>`;
-  }).join('');
-  document.querySelectorAll('#editPurchaseChips .multichip-with-toggle').forEach(c => {
-    c.addEventListener('click', e => {
-      if (e.target.classList.contains('toggle-ssms-btn')) {
-        e.stopPropagation();
-        const sibs = c.querySelectorAll('.toggle-ssms-btn');
-        sibs.forEach(s => s.classList.remove('active'));
-        e.target.classList.add('active');
-        return;
-      }
-      const m = c.dataset.machine;
-      if (c.classList.contains('selected')) {
-        // Deselect — remove both SS- and MS- prefixes
-        editPurchaseSet.delete('SS-' + m);
-        editPurchaseSet.delete('MS-' + m);
-        c.classList.remove('selected');
-      } else {
-        // Select with current active material
-        const mat = c.querySelector('.toggle-ssms-btn.active').dataset.mat;
-        editPurchaseSet.add(mat + '-' + m);
-        c.classList.add('selected');
-      }
-    });
-  });
-
-  // Pre-select existing attachments purchased
-  editPurchaseAttSet = new Set((v.attachmentsPurchased || '').split(',').filter(Boolean).map(s => s.trim()));
-  $('editPurchaseAttChips').innerHTML = attachments.map(a => {
-    const sel = editPurchaseAttSet.has(a);
-    return `<div class="multichip ${sel?'selected':''}" data-att="${a}">${a}</div>`;
-  }).join('');
-  document.querySelectorAll('#editPurchaseAttChips .multichip').forEach(c => {
-    c.addEventListener('click', () => {
-      const a = c.dataset.att;
-      if (editPurchaseAttSet.has(a)) { editPurchaseAttSet.delete(a); c.classList.remove('selected'); }
-      else { editPurchaseAttSet.add(a); c.classList.add('selected'); }
-    });
-  });
-
-  $('editModal').classList.add('visible');
-};
-
-// Toggle handlers
-$('editReturningToggle').addEventListener('click', e => {
-  const t = e.currentTarget;
-  const on = t.dataset.on === 'true';
-  t.dataset.on = !on;
-  t.classList.toggle('on', !on);
-});
-$('editRedemoToggle').addEventListener('click', e => {
-  const t = e.currentTarget;
-  const on = t.dataset.on === 'true';
-  t.dataset.on = !on;
-  t.classList.toggle('on', !on);
-});
-
-$('editCancel').addEventListener('click', () => $('editModal').classList.remove('visible'));
-
-$('editSubmit').addEventListener('click', async (e) => {
-  const btn = e.currentTarget;
-  if (btn.disabled) return;
-  if (!editVisitData) return;
-  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
-
-  // Build payload — only fields that may need editing
-  const payload = {
-    rowId: editVisitData.rowId,
-    fromLocation: $('editFrom').value.trim(),
-    outcome: $('editOutcome').value,
-    outcomeNotes: $('editNotes').value.trim(),
-    machinesPurchased: Array.from(editPurchaseSet),
-    attachmentsPurchased: Array.from(editPurchaseAttSet),
-    returningCustomer: $('editReturningToggle').dataset.on === 'true' ? 'Yes' : 'No',
-    reDemoAfterBilling: $('editRedemoToggle').dataset.on === 'true' ? 'Yes' : 'No'
-  };
-
-  try {
-    const r = await apiPost('updatevisit', payload);
-    if (r.status === 'success') {
-      toast('Saved ✓');
-      $('editModal').classList.remove('visible');
-      await refreshAll();
-    } else { toast(r.message || 'Failed'); }
-  } catch (err) { toast('Error: ' + err.message); }
-  finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
-});
 
 // PENDING FOLLOW-UP — customers with outcome "Buying later"
 function renderPending(visits) {

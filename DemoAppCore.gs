@@ -53,6 +53,7 @@ function doPost(e) {
     case 'checkin': return checkIn(bodyData);
     case 'startdemo': return startDemo(bodyData);
     case 'checkout': return checkOut(bodyData);
+    case 'updatevisit': return updateVisit(bodyData);
     case 'addmachine': return addMachine(bodyData);
     case 'addattachment': return addAttachment(bodyData);
     case 'savedailynotes': return saveDailyNotes(bodyData);
@@ -216,6 +217,68 @@ function checkOut(data) {
       status: 'success',
       demoMinutes: demoMinutes
     });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+// ==================== UPDATE VISIT (edit from dashboard) ====================
+// Allows owner to edit any field of a completed (or active) visit.
+// Only fields provided in `data` will be updated; others are left as-is.
+
+function updateVisit(data) {
+  try {
+    if (!data.rowId) return jsonResponse({ status: 'error', message: 'Missing rowId' });
+    const sheet = getSheet(TABS.DEMO_LOG);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'DemoLog sheet not found' });
+
+    const rowId = parseInt(data.rowId);
+
+    // Update each field only if provided
+    // C: FromLocation
+    if (data.fromLocation !== undefined) {
+      sheet.getRange(rowId, 3).setValue(data.fromLocation);
+    }
+    // D: MachinesDemoed
+    if (data.machinesDemoed !== undefined) {
+      const v = Array.isArray(data.machinesDemoed) ? data.machinesDemoed.join(', ') : (data.machinesDemoed || '');
+      sheet.getRange(rowId, 4).setValue(v);
+    }
+    // E: AttachmentsDemoed
+    if (data.attachmentsDemoed !== undefined) {
+      const v = Array.isArray(data.attachmentsDemoed) ? data.attachmentsDemoed.join(', ') : (data.attachmentsDemoed || '');
+      sheet.getRange(rowId, 5).setValue(v);
+    }
+    // I: Outcome (optional — allow setting to empty string)
+    if (data.outcome !== undefined) {
+      sheet.getRange(rowId, 9).setValue(data.outcome);
+    }
+    // J: OutcomeNotes
+    if (data.outcomeNotes !== undefined) {
+      sheet.getRange(rowId, 10).setValue(data.outcomeNotes);
+    }
+    // K: MachinesPurchased
+    if (data.machinesPurchased !== undefined) {
+      const v = Array.isArray(data.machinesPurchased) ? data.machinesPurchased.join(', ') : (data.machinesPurchased || '');
+      sheet.getRange(rowId, 11).setValue(v);
+    }
+    // L: AttachmentsPurchased
+    if (data.attachmentsPurchased !== undefined) {
+      const v = Array.isArray(data.attachmentsPurchased) ? data.attachmentsPurchased.join(', ') : (data.attachmentsPurchased || '');
+      sheet.getRange(rowId, 12).setValue(v);
+    }
+    // M: ReturningCustomer
+    if (data.returningCustomer !== undefined) {
+      const v = data.returningCustomer === true || data.returningCustomer === 'true' || data.returningCustomer === 'Yes' ? 'Yes' : 'No';
+      sheet.getRange(rowId, 13).setValue(v);
+    }
+    // N: ReDemoAfterBilling
+    if (data.reDemoAfterBilling !== undefined) {
+      const v = data.reDemoAfterBilling === true || data.reDemoAfterBilling === 'true' || data.reDemoAfterBilling === 'Yes' ? 'Yes' : 'No';
+      sheet.getRange(rowId, 14).setValue(v);
+    }
+
+    return jsonResponse({ status: 'success', rowId: rowId });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }

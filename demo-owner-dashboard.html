@@ -3,25 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>KM Demo Tracker — Owner Dashboard</title>
+<title>KM Dashboard</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #1c1c1e; min-height: 100vh; overflow-x: hidden;
+    background: #f5f5f7;
     -webkit-user-select: none; user-select: none;
-    position: relative; z-index: 0;
-    padding-bottom: 40px;
+    padding-bottom: 30px;
   }
-  #bg-image { position: fixed; inset: 0; z-index: -2;
-    background: url('https://raw.githubusercontent.com/arun6a/production-line-system/main/Background.jpg') center/cover no-repeat; }
-  #bg-overlay { position: fixed; inset: 0; z-index: -1; background: rgba(255,255,255,0.6); }
 
   /* HEADER */
   .header {
     position: sticky; top: 0; z-index: 10;
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: #ffffff;
     border-bottom: 1px solid rgba(0,0,0,0.06);
     padding: 12px 16px;
     padding-top: max(12px, env(safe-area-inset-top));
@@ -43,21 +39,18 @@
     padding: 12px 16px;
   }
   .kpi-card {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    background: #ffffff;
     border-radius: 14px; padding: 14px;
-    border: 1px solid rgba(0,0,0,0.04);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
   }
-  .kpi-label {
-    font-size: 11px; color: #6c6c70; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
-  }
-  .kpi-value { font-size: 30px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+  .kpi-label { font-size: 11px; color: #6c6c70; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
   .kpi-sub { font-size: 11px; color: #8c8c92; font-weight: 600; margin-top: 4px; }
   .kpi-card.primary .kpi-value { color: #007aff; }
+  .kpi-card.waiting .kpi-value { color: #ff9500; }
   .kpi-card.success .kpi-value { color: #34c759; }
-  .kpi-card.warning .kpi-value { color: #ff9500; }
+  .kpi-card.warning .kpi-value { color: #af52de; }
   .kpi-card.danger .kpi-value { color: #ff3b30; }
 
   /* SECTION */
@@ -68,27 +61,34 @@
   }
   .section-title small { font-size: 11px; color: #6c6c70; font-weight: 600; }
 
-  /* ACTIVE VISIT CARD */
+  /* VISIT CARD */
   .visit-card {
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: #ffffff;
     border-radius: 12px; padding: 12px; margin-bottom: 8px;
     border: 1px solid rgba(0,0,0,0.06);
   }
+  .visit-card.waiting { border-left: 4px solid #ff9500; }
+  .visit-card.active { border-left: 4px solid #007aff; }
+  .visit-card.completed { border-left: 4px solid #34c759; }
+  .visit-card.pending { border-left: 4px solid #af52de; }
   .visit-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-  .visit-num { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
-  .visit-timer { font-size: 16px; font-weight: 800; color: #007aff; font-variant-numeric: tabular-nums; }
+  .visit-num { font-size: 14px; font-weight: 800; letter-spacing: -0.3px; }
+  .visit-timer { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .visit-timer.active { color: #007aff; }
+  .visit-timer.waiting { color: #ff9500; }
   .visit-row { font-size: 12px; color: #3c3c43; margin-bottom: 2px; }
-  .chip { background: #f1f1f4; color: #1c1c1e; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 600; }
+  .visit-row strong { color: #1c1c1e; min-width: 65px; display: inline-block; }
+  .chip { background: #f1f1f4; color: #1c1c1e; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 600; margin-right: 3px; }
   .chip.blue { background: #e0ecff; color: #00408a; }
   .chip.orange { background: #ffe9d9; color: #8a3b00; }
+  .chip.green { background: #d4f5dd; color: #166534; }
+  .chip.purple { background: #f0e0ff; color: #4a0080; }
 
-  /* BAR CHART */
+  /* HOURLY + WEEKLY CHARTS */
   .chart-block {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    background: #ffffff;
     border-radius: 12px; padding: 14px;
-    border: 1px solid rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.05);
   }
   .bars-container { display: flex; align-items: flex-end; gap: 4px; height: 110px; padding-top: 6px; }
   .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -100,21 +100,18 @@
   .bar-legend { display: flex; gap: 12px; margin-top: 10px; justify-content: center; font-size: 10px; color: #6c6c70; font-weight: 600; }
   .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 
-  /* HOURLY CHART */
+  /* HOURLY */
   .hourly-bars { display: flex; align-items: flex-end; gap: 3px; height: 70px; padding-top: 6px; }
   .hour-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .hour-bar { width: 100%; max-width: 18px; background: #007aff; border-radius: 3px 3px 0 0; transition: height 0.4s; min-height: 2px; }
   .hour-label { font-size: 8.5px; color: #6c6c70; font-weight: 600; }
 
   /* OUTCOMES GRID */
-  .outcomes-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-  }
+  .outcomes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .outcome-tile {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    background: #ffffff;
     border-radius: 10px; padding: 10px 6px; text-align: center;
-    border: 1px solid rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.05);
   }
   .outcome-tile .ov { font-size: 18px; font-weight: 800; line-height: 1; }
   .outcome-tile .ol { font-size: 9.5px; color: #6c6c70; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
@@ -129,21 +126,26 @@
   .empty-state { text-align: center; padding: 16px; color: #6c6c70; font-size: 12px; font-weight: 600; }
 
   /* LAST UPDATE */
-  .last-update {
-    text-align: center; font-size: 10.5px; color: #8c8c92; font-weight: 600;
-    padding: 12px 16px 0;
+  .last-update { text-align: center; font-size: 10.5px; color: #8c8c92; font-weight: 600; padding: 12px 16px 0; }
+
+  /* DETAIL ROW (for completed customer info) */
+  .detail-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0; border-bottom: 1px solid #f1f1f4;
+    font-size: 12px;
   }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .dk { color: #6c6c70; font-weight: 600; }
+  .detail-row .dv { color: #1c1c1e; font-weight: 700; text-align: right; }
 </style>
 </head>
 <body>
-<div id="bg-image"></div>
-<div id="bg-overlay"></div>
 
 <!-- HEADER -->
 <div class="header">
   <img class="header-logo" src="https://raw.githubusercontent.com/arun6a/production-line-system/main/logo.jpg" alt="KM">
   <div class="header-titles">
-    <div class="header-title">Owner Dashboard</div>
+    <div class="header-title">KM Dashboard</div>
     <div class="header-sub" id="todayDate">—</div>
   </div>
   <div class="header-status">
@@ -157,7 +159,12 @@
   <div class="kpi-card primary">
     <div class="kpi-label">Today's Visits</div>
     <div class="kpi-value" id="kpiTotal">0</div>
-    <div class="kpi-sub" id="kpiActive">0 active now</div>
+    <div class="kpi-sub" id="kpiActive">0 active</div>
+  </div>
+  <div class="kpi-card waiting">
+    <div class="kpi-label">Waiting</div>
+    <div class="kpi-value" id="kpiWaiting">0</div>
+    <div class="kpi-sub" id="kpiWaitTime">wait: 0m</div>
   </div>
   <div class="kpi-card success">
     <div class="kpi-label">Purchased</div>
@@ -167,20 +174,39 @@
   <div class="kpi-card warning">
     <div class="kpi-label">Demo Time</div>
     <div class="kpi-value" id="kpiDemoTime">0m</div>
-    <div class="kpi-sub" id="kpiActiveTime">+0m in progress</div>
-  </div>
-  <div class="kpi-card danger">
-    <div class="kpi-label">Lost (Wrong)</div>
-    <div class="kpi-value" id="kpiWrong">0</div>
     <div class="kpi-sub" id="kpiLater">0 buying later</div>
   </div>
 </div>
 
-<!-- ACTIVE VISITS -->
+<!-- WAITING TO START -->
+<div class="section">
+  <div class="section-title">Waiting to Start Demo <small id="waitingCount">0</small></div>
+  <div id="waitingList">
+    <div class="empty-state">No customers waiting.</div>
+  </div>
+</div>
+
+<!-- ACTIVE DEMOS -->
 <div class="section">
   <div class="section-title">Live Demos <small id="activeCount">0</small></div>
   <div id="activeList">
     <div class="empty-state">No active demos right now.</div>
+  </div>
+</div>
+
+<!-- COMPLETED CUSTOMER INFO -->
+<div class="section">
+  <div class="section-title">Completed Customers — Today <small id="completedCount">0</small></div>
+  <div id="completedList">
+    <div class="empty-state">No completed demos yet today.</div>
+  </div>
+</div>
+
+<!-- PENDING FOLLOW-UP -->
+<div class="section">
+  <div class="section-title">Pending Follow-Up (Buying Later) <small id="pendingCount">0</small></div>
+  <div id="pendingList">
+    <div class="empty-state">No pending follow-ups today.</div>
   </div>
 </div>
 
@@ -205,7 +231,7 @@
   </div>
 </div>
 
-<!-- WEEKLY TREND CHART -->
+<!-- WEEKLY TREND -->
 <div class="section">
   <div class="section-title">Last 7 Days — Visits & Purchases</div>
   <div class="chart-block">
@@ -217,16 +243,16 @@
   </div>
 </div>
 
-<!-- LAST UPDATE -->
 <div class="last-update" id="lastUpdate">Last updated: —</div>
 
 <script>
-// ==================== CONFIG ====================
 const CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbxPVE9P839LDC_G23VojLIi39yCC0omUY8LFZLjiNpS9weQhXXDHbzYA2QbIREWPLcbnw/exec'
 };
 
-// ==================== UTILS ====================
+let serverToday = null;
+let recentVisits = [];
+
 function $(id) { return document.getElementById(id); }
 function cacheBust(url) { return url + (url.includes('?')?'&':'?') + 't=' + Date.now(); }
 async function apiGet(action) {
@@ -250,15 +276,14 @@ function fmtTimer(isoStart) {
   return m + ':' + String(s).padStart(2,'0');
 }
 
-// ==================== INIT ====================
 async function init() {
   $('todayDate').textContent = fmtDate(new Date());
   renderHourlySkeleton();
   renderWeeklySkeleton();
   await refreshAll();
   setStatus(true);
-  setInterval(refreshAll, 15000);  // refresh every 15s
-  setInterval(refreshTimers, 1000); // tick live timer every second
+  setInterval(refreshAll, 15000);
+  setInterval(refreshTimers, 1000);
 }
 
 function setStatus(online) {
@@ -272,17 +297,29 @@ function refreshTimers() {
     const t = card.querySelector('.visit-timer');
     if (t) t.textContent = fmtTimer(start);
   });
+  document.querySelectorAll('.visit-card[data-waitstart]').forEach(card => {
+    const start = card.getAttribute('data-waitstart');
+    const t = card.querySelector('.visit-timer');
+    if (t) t.textContent = fmtTimer(start);
+  });
 }
 
 async function refreshAll() {
   try {
-    const [summary, active, trend] = await Promise.all([
+    const [summary, activeResp, recent, trend] = await Promise.all([
       apiGet('gettodaysummary'),
       apiGet('getactivevisits'),
+      apiGet('getrecentvisits'),
       apiGet('getweeklytrend')
     ]);
+    if (summary.summary && summary.summary.today) serverToday = summary.summary.today;
+    if (recent.today) serverToday = recent.today;
+    recentVisits = recent.visits || [];
     renderKPIs(summary.summary);
-    renderActive(active.visits);
+    renderWaiting(activeResp.waiting || []);
+    renderActive(activeResp.active || []);
+    renderCompleted(recentVisits);
+    renderPending(recentVisits);
     renderOutcomes(summary.summary);
     renderHourly(summary.summary.hourlyBreakdown || {});
     renderWeekly(trend.trend || []);
@@ -294,20 +331,39 @@ async function refreshAll() {
   }
 }
 
-// ==================== KPI RENDER ====================
 function renderKPIs(s) {
   $('kpiTotal').textContent = s.totalVisits || 0;
-  $('kpiActive').textContent = (s.activeCount || 0) + ' active now';
+  $('kpiActive').textContent = (s.activeCount || 0) + ' active';
+  $('kpiWaiting').textContent = s.waitingCount || 0;
+  $('kpiWaitTime').textContent = 'wait: ' + fmtElapsed(s.totalWaitMinutes || 0);
   $('kpiPurchased').textContent = s.purchased || 0;
   $('kpiConv').textContent = (s.conversionRate || 0) + '% conversion';
   $('kpiDemoTime').textContent = fmtElapsed(s.totalDemoMinutes || 0);
-  $('kpiActiveTime').textContent = '+' + fmtElapsed(s.activeElapsedMinutes || 0) + ' in progress';
-  $('kpiWrong').textContent = s.wrongMachine || 0;
   $('kpiLater').textContent = (s.buyingLater || 0) + ' buying later';
+  $('waitingCount').textContent = s.waitingCount || 0;
   $('activeCount').textContent = s.activeCount || 0;
 }
 
-// ==================== ACTIVE VISITS ====================
+function renderWaiting(visits) {
+  const list = $('waitingList');
+  if (!visits || visits.length === 0) {
+    list.innerHTML = '<div class="empty-state">No customers waiting.</div>';
+    return;
+  }
+  list.innerHTML = visits.map(v => {
+    const chips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
+    return `
+      <div class="visit-card waiting" data-waitstart="${v.waitStartTime}">
+        <div class="visit-head">
+          <div class="visit-num">Customer ${v.customerNum}</div>
+          <div class="visit-timer waiting">${fmtTimer(v.waitStartTime)}</div>
+        </div>
+        <div class="visit-row"><strong>From:</strong> ${v.fromLocation || '—'}</div>
+        <div class="visit-row"><strong>Machines:</strong> ${chips || '—'}</div>
+      </div>`;
+  }).join('');
+}
+
 function renderActive(visits) {
   const list = $('activeList');
   if (!visits || visits.length === 0) {
@@ -317,20 +373,77 @@ function renderActive(visits) {
   list.innerHTML = visits.map(v => {
     const chips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
     const attChips = (v.attachmentsDemoed || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const waitInfo = v.waitMinutes ? `<span class="chip purple">Waited ${v.waitMinutes}m</span>` : '';
     return `
-      <div class="visit-card" data-start="${v.startTime}">
+      <div class="visit-card active" data-start="${v.startTime}">
         <div class="visit-head">
-          <div class="visit-num">#${v.customerNum}</div>
-          <div class="visit-timer">${fmtTimer(v.startTime)}</div>
+          <div class="visit-num">Customer ${v.customerNum}</div>
+          <div class="visit-timer active">${fmtTimer(v.startTime)}</div>
         </div>
         <div class="visit-row"><strong>From:</strong> ${v.fromLocation || '—'}</div>
-        <div class="visit-row"><strong>Machines:</strong> ${chips || '—'}</div>
+        <div class="visit-row"><strong>Machines:</strong> ${chips || '—'} ${waitInfo}</div>
         ${attChips ? `<div class="visit-row"><strong>Attach:</strong> ${attChips}</div>` : ''}
       </div>`;
   }).join('');
 }
 
-// ==================== OUTCOMES ====================
+// COMPLETED CUSTOMER INFO — full details per customer
+function renderCompleted(visits) {
+  const list = $('completedList');
+  const today = serverToday || new Date().toISOString().substring(0,10);
+  const todayCompleted = (visits || []).filter(v => v.date === today && v.endTime);
+  $('completedCount').textContent = todayCompleted.length;
+  if (todayCompleted.length === 0) {
+    list.innerHTML = '<div class="empty-state">No completed demos yet today.</div>';
+    return;
+  }
+  list.innerHTML = todayCompleted.map(v => {
+    const purchChips = (v.machinesPurchased || '').split(',').filter(Boolean).map(p => `<span class="chip green">${p.trim()}</span>`).join(' ');
+    const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
+    const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip orange">${a.trim()}</span>`).join(' ');
+    const waitStr = v.waitMinutes ? ` (waited ${v.waitMinutes}m)` : '';
+    const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip purple">Returning</span>` : '';
+    return `
+      <div class="visit-card completed">
+        <div class="visit-head">
+          <div class="visit-num">Customer ${v.customerNum}</div>
+          <div style="font-size:11px;color:#6c6c70;font-weight:700;">${fmtElapsed(v.demoMinutes || 0)}${waitStr}</div>
+        </div>
+        <div class="visit-row"><strong>From:</strong> ${v.fromLocation || '—'} ${retBadge}</div>
+        <div class="visit-row"><strong>Demoed:</strong> ${demoChips || '—'}</div>
+        ${purchChips ? `<div class="visit-row"><strong>Bought:</strong> ${purchChips}</div>` : ''}
+        ${attChips ? `<div class="visit-row"><strong>Attach:</strong> ${attChips}</div>` : ''}
+        ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;">"${v.outcomeNotes}"</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// PENDING FOLLOW-UP — customers with outcome "Buying later"
+function renderPending(visits) {
+  const list = $('pendingList');
+  const today = serverToday || new Date().toISOString().substring(0,10);
+  const pending = (visits || []).filter(v => v.date === today && v.endTime && (v.outcome || '').toLowerCase() === 'buying later');
+  $('pendingCount').textContent = pending.length;
+  if (pending.length === 0) {
+    list.innerHTML = '<div class="empty-state">No pending follow-ups today.</div>';
+    return;
+  }
+  list.innerHTML = pending.map(v => {
+    const demoChips = (v.machinesDemoed || '').split(',').filter(Boolean).map(m => `<span class="chip blue">${m.trim()}</span>`).join(' ');
+    return `
+      <div class="visit-card pending">
+        <div class="visit-head">
+          <div class="visit-num">Customer ${v.customerNum}</div>
+          <div style="font-size:11px;color:#6c6c70;font-weight:700;">${fmtElapsed(v.demoMinutes || 0)} demo</div>
+        </div>
+        <div class="visit-row"><strong>From:</strong> ${v.fromLocation || '—'}</div>
+        <div class="visit-row"><strong>Demoed:</strong> ${demoChips || '—'}</div>
+        ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;">"${v.outcomeNotes}"</div>` : ''}
+        <div class="visit-row" style="margin-top:6px;color:#af52de;font-weight:700;">→ Call customer to follow up</div>
+      </div>`;
+  }).join('');
+}
+
 function renderOutcomes(s) {
   $('obPurchased').textContent = s.purchased || 0;
   $('obLater').textContent = s.buyingLater || 0;
@@ -340,7 +453,6 @@ function renderOutcomes(s) {
   $('obWrong').textContent = s.wrongMachine || 0;
 }
 
-// ==================== HOURLY ====================
 function renderHourlySkeleton() {
   const hours = ['9','10','11','12','13','14','15','16','17','18'];
   $('hourlyBars').innerHTML = hours.map(h => `
@@ -363,9 +475,7 @@ function renderHourly(hourly) {
   });
 }
 
-// ==================== WEEKLY TREND ====================
 function renderWeeklySkeleton() {
-  // placeholder, will fill on data load
   $('weeklyBars').innerHTML = '<div class="empty-state">Loading...</div>';
 }
 
@@ -392,7 +502,6 @@ function renderWeekly(trend) {
   }).join('');
 }
 
-// ==================== START ====================
 init();
 </script>
 </body>

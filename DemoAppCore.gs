@@ -436,7 +436,7 @@ function getTodaySummary() {
     }
 
     // Weekly (last 7 days) and monthly stats
-    const now = new Date();
+    // ('now' is already declared above at the top of getTodaySummary)
     const weekAgo = new Date(now);
     weekAgo.setDate(now.getDate() - 6);  // 7 days including today
     const weekAgoStr = formatDate(weekAgo);

@@ -412,7 +412,8 @@ function isKnownSerial(serial) {
                 html += `<div style="margin-top:12px;margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.04);border-radius:8px;font-size:11px;font-weight:800;color:#8e8e93;text-transform:uppercase;letter-spacing:0.5px;">${date}</div>`;
                 grouped[date].forEach(i => {
                     const prefix = getMaterialTypeFromSerial(i.serial) || 'MS';
-                    const fullName = `${prefix} Machine`;
+                    // Build full machine name from SERIAL_MAP if available, otherwise from prefix
+                    let fullName = SERIAL_MAP[i.serial] || (prefix + ' Machine');
                     const color = getMachineColor(fullName);
                     const invoiceText = i.invoice ? `<span style="color:#8e8e93;font-size:11px;margin-left:6px;">#${i.invoice}</span>` : '';
                     html += `<div class="history-item"><span style="font-weight:600;"><span class="status-dot" style="background:${i.status==='pending'?'#ff9500':'#34c759'}"></span><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:${color};color:white;font-size:10px;font-weight:700;margin-right:6px;">${fullName}</span>${i.customer} <span style="opacity:0.6;font-size:11px">${i.serial.substring(0,14)}</span>${invoiceText}</span><span style="color:#8e8e93;font-size:12px">${i.status==='pending'?'⏳':''}</span></div>`;

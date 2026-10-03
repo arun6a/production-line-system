@@ -202,15 +202,30 @@ function checkOut(data) {
     sheet.getRange(rowId, 11).setValue(machinesPurchased);         // K: MachinesPurchased
     sheet.getRange(rowId, 12).setValue(attachmentsPurchased);      // L: AttachmentsPurchased
 
-    // Update machines demoed if provided (additional demos done during visit)
+    // Merge "additional demoed" with existing (NOT overwrite — preserves check-in selections)
+    // D: MachinesDemoed
     if (data.machinesDemoed) {
-      const machDemoed = Array.isArray(data.machinesDemoed) ? data.machinesDemoed.join(', ') : data.machinesDemoed;
-      sheet.getRange(rowId, 4).setValue(machDemoed);
+      const existingStr = (sheet.getRange(rowId, 4).getValue() || '').toString();
+      const existingList = existingStr.split(',').map(function(s){return s.trim();}).filter(Boolean);
+      const additionalList = Array.isArray(data.machinesDemoed) ? data.machinesDemoed : [data.machinesDemoed];
+      const merged = [];
+      const seen = {};
+      [].concat(existingList, additionalList).forEach(function(m) {
+        if (m && !seen[m]) { seen[m] = true; merged.push(m); }
+      });
+      sheet.getRange(rowId, 4).setValue(merged.join(', '));
     }
-    // Update attachments demoed if provided
+    // E: AttachmentsDemoed
     if (data.attachmentsDemoed) {
-      const attDemoed = Array.isArray(data.attachmentsDemoed) ? data.attachmentsDemoed.join(', ') : data.attachmentsDemoed;
-      sheet.getRange(rowId, 5).setValue(attDemoed);
+      const existingStr = (sheet.getRange(rowId, 5).getValue() || '').toString();
+      const existingList = existingStr.split(',').map(function(s){return s.trim();}).filter(Boolean);
+      const additionalList = Array.isArray(data.attachmentsDemoed) ? data.attachmentsDemoed : [data.attachmentsDemoed];
+      const merged = [];
+      const seen = {};
+      [].concat(existingList, additionalList).forEach(function(a) {
+        if (a && !seen[a]) { seen[a] = true; merged.push(a); }
+      });
+      sheet.getRange(rowId, 5).setValue(merged.join(', '));
     }
 
     return jsonResponse({

@@ -1226,3 +1226,32 @@ function sendDailySummary() {
     Logger.log('sendDailySummary error: ' + e.toString());
   }
 }
+
+
+// ==================== TEST FCM (diagnostic) ====================
+function testFCM() {
+  const props = PropertiesService.getScriptProperties();
+  Logger.log('1. FIREBASE_PROJECT_ID: ' + props.getProperty('FIREBASE_PROJECT_ID'));
+  Logger.log('2. FIREBASE_CLIENT_EMAIL: ' + props.getProperty('FIREBASE_CLIENT_EMAIL'));
+  const pk = props.getProperty('FIREBASE_PRIVATE_KEY');
+  Logger.log('3. FIREBASE_PRIVATE_KEY: ' + (pk ? 'set, length=' + pk.length + ', starts with: ' + pk.substring(0, 30) : 'NOT SET'));
+  if (pk && pk.indexOf('BEGIN PRIVATE KEY') < 0) {
+    Logger.log('ERROR: Private key missing BEGIN marker. Re-download JSON from Firebase.');
+    return;
+  }
+  const tokens = getAllFCMTokens();
+  Logger.log('4. Registered device tokens: ' + tokens.length);
+  if (tokens.length === 0) {
+    Logger.log('NOTE: Open the APK on your phone, then re-run testFCM.');
+    return;
+  }
+  try {
+    const at = getFCMAccessToken();
+    Logger.log('5. FCM access token: ' + at.substring(0, 30) + '...');
+  } catch (e) {
+    Logger.log('5. FAILED: ' + e.toString());
+    return;
+  }
+  sendFCMNotification('KM Test', 'If you see this, FCM works!', { type: 'test' });
+  Logger.log('6. Test sent. Check phone.');
+}

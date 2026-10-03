@@ -82,6 +82,29 @@
     cursor: pointer;
   }
   .btn-edit:active { background: #e5e5ea; }
+  .btn-redemo {
+    margin-top: 8px; width: 100%;
+    background: #af52de; color: white;
+    border: none; border-radius: 8px;
+    padding: 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-redemo:active { background: #9b3fcd; }
+
+  /* === SECTION TITLE ACCENT COLORS === */
+  .section-title { padding-left: 10px; position: relative; }
+  .section-title::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 18px; border-radius: 2px;
+    background: #1c1c1e;
+  }
+  .section-accent-waiting::before { background: #ff9500; }
+  .section-accent-active::before { background: #007aff; }
+  .section-accent-completed::before { background: #34c759; }
+  .section-accent-notes::before { background: #8c8c92; }
+  .section-accent-hourly::before { background: #007aff; }
+  .section-accent-outcomes::before { background: #af52de; }
+  .section-accent-weekly::before { background: #ff6b35; }
   .visit-card-head {
     display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
   }
@@ -477,7 +500,7 @@
 
 <!-- WAITING -->
 <div class="section">
-  <div class="section-title">Waiting to Start Demo <small id="waitingCount">0</small></div>
+  <div class="section-title section-accent-waiting">Waiting to Start Demo <small id="waitingCount">0</small></div>
   <div id="waitingList">
     <div class="empty-state">No customers waiting.</div>
   </div>
@@ -485,7 +508,7 @@
 
 <!-- ACTIVE -->
 <div class="section">
-  <div class="section-title">Active Demos <small id="activeCount">0</small></div>
+  <div class="section-title section-accent-active">Active Demos <small id="activeCount">0</small></div>
   <div id="activeList">
     <div class="empty-state">No active demos.</div>
   </div>
@@ -493,7 +516,7 @@
 
 <!-- COMPLETED TODAY -->
 <div class="section">
-  <div class="section-title">Completed Today <small id="completedCount">0</small></div>
+  <div class="section-title section-accent-completed">Completed Today <small id="completedCount">0</small></div>
   <div id="completedList">
     <div class="empty-state">No completed demos yet today.</div>
   </div>
@@ -501,7 +524,7 @@
 
 <!-- OTHER WORKS -->
 <div class="notes-block">
-  <div class="modal-section-label" style="margin-bottom:8px;">Other Works / End-of-Day Notes</div>
+  <div class="modal-section-label section-accent-notes" style="margin-bottom:8px;">Other Works / End-of-Day Notes</div>
   <textarea id="otherWorks" placeholder="Repairs, machine cleaning, customer calls, stock counting, etc."></textarea>
   <div style="margin-top:8px; display:flex; align-items:center;">
     <button class="save-notes-btn" id="saveNotesBtn">Save Notes</button>
@@ -556,7 +579,7 @@
 
   <!-- WAITING TO START -->
   <div class="section">
-    <div class="section-title">Waiting to Start Demo <small id="dashWaitingCount">0</small></div>
+    <div class="section-title section-accent-waiting">Waiting to Start Demo <small id="dashWaitingCount">0</small></div>
     <div id="dashWaitingList">
       <div class="empty-state">No customers waiting.</div>
     </div>
@@ -564,7 +587,7 @@
 
   <!-- ACTIVE DEMOS -->
   <div class="section">
-    <div class="section-title">Live Demos <small id="dashActiveCount">0</small></div>
+    <div class="section-title section-accent-active">Live Demos <small id="dashActiveCount">0</small></div>
     <div id="dashActiveList">
       <div class="empty-state">No active demos right now.</div>
     </div>
@@ -572,7 +595,7 @@
 
   <!-- COMPLETED CUSTOMERS -->
   <div class="section">
-    <div class="section-title">Completed Customers — Today <small id="dashCompletedCount">0</small></div>
+    <div class="section-title section-accent-completed">Completed Customers — Today <small id="dashCompletedCount">0</small></div>
     <div id="dashCompletedList">
       <div class="empty-state">No completed demos yet today.</div>
     </div>
@@ -580,7 +603,7 @@
 
   <!-- HOURLY CHART -->
   <div class="section">
-    <div class="section-title">Hourly Visits — Today <small id="hourlyMax">peak: 0</small></div>
+    <div class="section-title section-accent-hourly">Hourly Visits — Today <small id="hourlyMax">peak: 0</small></div>
     <div class="chart-block">
       <div class="hourly-bars" id="hourlyBars"></div>
     </div>
@@ -588,7 +611,7 @@
 
   <!-- OUTCOMES BREAKDOWN -->
   <div class="section">
-    <div class="section-title">Outcomes — Today</div>
+    <div class="section-title section-accent-outcomes">Outcomes — Today</div>
     <div class="outcomes-grid">
       <div class="outcome-tile purchased"><div class="ov" id="obPurchased">0</div><div class="ol">Purchased</div></div>
       <div class="outcome-tile later"><div class="ov" id="obLater">0</div><div class="ol">Buying Later</div></div>
@@ -601,7 +624,7 @@
 
   <!-- WEEKLY TREND -->
   <div class="section">
-    <div class="section-title">Last 7 Days — Visits & Purchases</div>
+    <div class="section-title section-accent-weekly">Last 7 Days — Visits & Purchases</div>
     <div class="chart-block">
       <div class="bars-container" id="weeklyBars"></div>
       <div class="bar-legend">
@@ -713,13 +736,6 @@
       <div class="multichips" id="purchaseAttachmentChips"><div class="empty-state" style="padding:8px;">Loading...</div></div>
     </div>
 
-    <div class="modal-section">
-      <div class="toggle-row">
-        <span class="toggle-label">Re-demo after billing?</span>
-        <div class="toggle" id="redemoToggle" data-on="false"></div>
-      </div>
-    </div>
-
     <div class="modal-actions">
       <button class="btn-cancel" id="checkoutCancel">Cancel</button>
       <button class="btn-primary" id="checkoutSubmit">Submit Checkout</button>
@@ -802,6 +818,7 @@ let serverToday = null;
 let recentVisits = [];
 let activeVisitRowId = null;
 let activeVisitStart = null;
+let pendingOriginalRowId = null;  // set when starting a re-demo, sent with checkIn
 let checkoutData = { machines: new Set(), attachments: new Set(), additionalMachines: new Set(), additionalAttachments: new Set() };
 let checkinData = { machines: new Set(), attachments: new Set() };
 
@@ -1003,7 +1020,13 @@ function renderCompleted(visits) {
     const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip" style="background:#ffe9d9;color:#8a3b00;">${a.trim()}</span>`).join(' ');
     const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip returning">Returning</span>` : '';
-    const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
+    // Re-demo tracking: show badge if a re-demo has been done from this visit
+    const isRedemoed = (v.reDemo || '').toLowerCase().indexOf('re-demoed') >= 0;
+    const redemoBadge = isRedemoed ? `<span class="chip" style="background:#d4f5dd;color:#166534;">Re-demoed ✓</span>` : '';
+    // "Re-demo of Customer N" badge — if this visit IS a re-demo of another visit
+    const isRedemoVisit = v.originalRowId && String(v.originalRowId).trim() !== '';
+    const originalVisit = isRedemoVisit ? recentVisits.find(x => String(x.rowId) === String(v.originalRowId)) : null;
+    const redemoOfBadge = isRedemoVisit ? (originalVisit ? `<span class="chip" style="background:#f0e0ff;color:#4a0080;">Re-demo of Customer ${originalVisit.customerNum}</span>` : `<span class="chip" style="background:#f0e0ff;color:#4a0080;">Re-demo visit</span>`) : '';
     return `
       <div class="visit-card completed">
         <div class="visit-card-head">
@@ -1017,9 +1040,12 @@ function renderCompleted(visits) {
         ${attDemoChips ? `<div class="visit-row"><span class="label">Attach Demoed:</span> <div class="chip-list">${attDemoChips}</div></div>` : ''}
         ${purchChips ? `<div class="visit-row"><span class="label">Bought:</span> <div class="chip-list">${purchChips}</div></div>` : ''}
         ${attChips ? `<div class="visit-row"><span class="label">Attach Bought:</span> <div class="chip-list">${attChips}</div></div>` : ''}
-        ${redemoBadge ? `<div style="margin-top:6px;">${redemoBadge}</div>` : ''}
+        ${(redemoBadge || redemoOfBadge) ? `<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">${redemoBadge}${redemoOfBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;margin-top:4px;">"${v.outcomeNotes}"</div>` : ''}
-        <button class="btn-edit" onclick="openEdit(${v.rowId})">Edit</button>
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <button class="btn-edit" style="flex:1;" onclick="openEdit(${v.rowId})">Edit</button>
+          <button class="btn-redemo" style="flex:1;" onclick="startRedemo(${v.rowId})">Re-Demo</button>
+        </div>
       </div>`;
   }).join('');
 }
@@ -1050,6 +1076,7 @@ $('checkinFab').addEventListener('click', openCheckIn);
 async function openCheckIn() {
   checkinData.machines = new Set();
   checkinData.attachments = new Set();
+  pendingOriginalRowId = null;  // reset for regular check-in
   $('returningToggle').dataset.on = 'false';
   $('returningToggle').classList.remove('on');
   $('locationText').value = '';
@@ -1160,14 +1187,20 @@ $('checkinSubmit').addEventListener('click', async (e) => {
   // From location is now OPTIONAL — no validation
   btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
   try {
-    const r = await apiPost('checkin', {
+    const payload = {
       fromLocation: $('locationText').value.trim(),
       machinesDemoed: Array.from(checkinData.machines),
       attachmentsDemoed: Array.from(checkinData.attachments),
       returningCustomer: $('returningToggle').dataset.on === 'true'
-    });
+    };
+    // If this is a re-demo, include the original visit's rowId so the new visit gets linked
+    if (pendingOriginalRowId) {
+      payload.originalRowId = pendingOriginalRowId;
+    }
+    const r = await apiPost('checkin', payload);
     if (r.status === 'success') {
-      toast('Customer ' + r.customerNum + ' checked in (waiting)');
+      toast('Customer ' + r.customerNum + ' checked in (waiting)' + (pendingOriginalRowId ? ' — re-demo' : ''));
+      pendingOriginalRowId = null;
       $('checkinModal').classList.remove('visible');
       await refreshAll();
     } else { toast(r.message || 'Failed'); }
@@ -1187,6 +1220,68 @@ window.startDemo = async function(rowId) {
   } catch (e) { toast('Error: ' + e.message); }
 };
 
+// ====== START RE-DEMO (from completed card) ======
+// Opens the check-in modal pre-filled with the original visit's data,
+// sets originalRowId so checkIn links the new visit back to this one.
+window.startRedemo = async function(originalRowId) {
+  // Find the original visit
+  const v = recentVisits.find(x => String(x.rowId) === String(originalRowId));
+  if (!v) {
+    toast('Original visit not found');
+    return;
+  }
+  // Reset check-in state
+  checkinData.machines = new Set();
+  checkinData.attachments = new Set();
+  $('returningToggle').dataset.on = 'true';
+  $('returningToggle').classList.add('on');
+  $('locationText').value = v.fromLocation || '';
+  $('newMachine').value = '';
+  $('newAttachment').value = '';
+
+  // Force-reload machines/attachments if empty
+  if (!machines.length || !attachments.length) {
+    await loadMachinesAndAttachments();
+  }
+
+  // Pre-select machines/attachments from the original visit
+  (v.machinesDemoed || '').split(',').filter(Boolean).forEach(m => {
+    const trimmed = m.trim();
+    if (trimmed) checkinData.machines.add(trimmed);
+  });
+  (v.attachmentsDemoed || '').split(',').filter(Boolean).forEach(a => {
+    const trimmed = a.trim();
+    if (trimmed) checkinData.attachments.add(trimmed);
+  });
+
+  // Render chips with pre-selections
+  renderMachineChips();
+  renderAttachmentChips();
+  // Force "selected" state on the chips that match the pre-selected set
+  document.querySelectorAll('#machineChips .multichip').forEach(c => {
+    if (checkinData.machines.has(c.dataset.machine)) c.classList.add('selected');
+  });
+  document.querySelectorAll('#attachmentChips .multichip').forEach(c => {
+    if (checkinData.attachments.has(c.dataset.attachment)) c.classList.add('selected');
+  });
+
+  // Quick buttons for location
+  document.querySelectorAll('#locationQuick .quick-btn').forEach(b => {
+    b.onclick = () => { $('locationText').value = b.dataset.loc; };
+  });
+
+  // Set preview customer number + show original context
+  const stat = $('statTotal').textContent;
+  $('checkinPreview').innerHTML =
+    `Will be assigned: Customer ${parseInt(stat) + 1}<br>` +
+    `<span style="color:#af52de;font-size:11px;">Re-demo of Customer ${v.customerNum}</span>`;
+
+  // Stash the originalRowId so checkIn submit can include it
+  pendingOriginalRowId = originalRowId;
+
+  $('checkinModal').classList.add('visible');
+};
+
 // ====== CHECKOUT MODAL ======
 window.openCheckout = function(rowId, startTime, customerNum) {
   activeVisitRowId = rowId;
@@ -1195,8 +1290,6 @@ window.openCheckout = function(rowId, startTime, customerNum) {
   checkoutData.attachments = new Set();
   checkoutData.additionalMachines = new Set();
   checkoutData.additionalAttachments = new Set();
-  $('redemoToggle').dataset.on = 'false';
-  $('redemoToggle').classList.remove('on');
   $('checkoutTitle').textContent = 'Check Out — Customer ' + customerNum;
   $('checkoutSub').textContent = 'Demo time: ' + fmtElapsed(Math.round((Date.now() - new Date(startTime).getTime())/60000));
   $('outcomeSelect').value = '';
@@ -1259,13 +1352,6 @@ window.openCheckout = function(rowId, startTime, customerNum) {
   $('checkoutModal').classList.add('visible');
 };
 
-$('redemoToggle').addEventListener('click', e => {
-  const t = e.currentTarget;
-  const on = t.dataset.on === 'true';
-  t.dataset.on = !on;
-  t.classList.toggle('on', !on);
-});
-
 $('checkoutCancel').addEventListener('click', () => $('checkoutModal').classList.remove('visible'));
 
 $('checkoutSubmit').addEventListener('click', async (e) => {
@@ -1290,8 +1376,7 @@ $('checkoutSubmit').addEventListener('click', async (e) => {
       machinesPurchased: machinesPurchased,
       attachmentsPurchased: Array.from(checkoutData.attachments),
       machinesDemoed: Array.from(checkoutData.additionalMachines),
-      attachmentsDemoed: Array.from(checkoutData.additionalAttachments),
-      reDemoAfterBilling: $('redemoToggle').dataset.on === 'true' ? 'Yes' : 'No'
+      attachmentsDemoed: Array.from(checkoutData.additionalAttachments)
     });
     if (r.status === 'success') {
       toast('Checked out: ' + fmtElapsed(r.demoMinutes));
@@ -1554,7 +1639,13 @@ function renderDashboardCompleted(visits) {
     const attChips = (v.attachmentsPurchased || '').split(',').filter(Boolean).map(a => `<span class="chip" style="background:#ffe9d9;color:#8a3b00;">${a.trim()}</span>`).join(' ');
     const waitStr = v.waitMinutes ? `Waited ${v.waitMinutes}m` : 'No wait';
     const retBadge = v.returningCustomer === 'Yes' ? `<span class="chip returning">Returning</span>` : '';
-    const redemoBadge = v.reDemo && v.reDemo !== '' ? `<span class="chip orange">Re-demo: ${v.reDemo}</span>` : '';
+    const redemoBadge = (v.reDemo || '').toLowerCase().indexOf('re-demoed') >= 0
+      ? `<span class="chip" style="background:#d4f5dd;color:#166534;">Re-demoed ✓</span>` : '';
+    const isRedemoVisit = v.originalRowId && String(v.originalRowId).trim() !== '';
+    const originalVisit = isRedemoVisit ? (visits || []).find(x => String(x.rowId) === String(v.originalRowId)) : null;
+    const redemoOfBadge = isRedemoVisit
+      ? (originalVisit ? `<span class="chip" style="background:#f0e0ff;color:#4a0080;">Re-demo of Customer ${originalVisit.customerNum}</span>` : `<span class="chip" style="background:#f0e0ff;color:#4a0080;">Re-demo visit</span>`)
+      : '';
     return `
       <div class="visit-card completed">
         <div class="visit-card-head">
@@ -1568,7 +1659,7 @@ function renderDashboardCompleted(visits) {
         ${attDemoChips ? `<div class="visit-row"><span class="label">Attach Demoed:</span> <div class="chip-list">${attDemoChips}</div></div>` : ''}
         ${purchChips ? `<div class="visit-row"><span class="label">Bought:</span> <div class="chip-list">${purchChips}</div></div>` : ''}
         ${attChips ? `<div class="visit-row"><span class="label">Attach Bought:</span> <div class="chip-list">${attChips}</div></div>` : ''}
-        ${redemoBadge ? `<div style="margin-top:6px;">${redemoBadge}</div>` : ''}
+        ${(redemoBadge || redemoOfBadge) ? `<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">${redemoBadge}${redemoOfBadge}</div>` : ''}
         ${v.outcomeNotes ? `<div class="visit-row" style="font-style:italic;color:#6c6c70;margin-top:4px;">"${v.outcomeNotes}"</div>` : ''}
       </div>`;
   }).join('');

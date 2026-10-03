@@ -96,6 +96,7 @@ function checkIn(data) {
 
     // Customer enters WAITING state — StartTime (F) and EndTime (G) left empty.
     // WaitStartTime (O) is set so the wait timer starts immediately.
+    // OriginalRowId (Q) — if this is a re-demo, links to the original visit's row.
     sheet.appendRow([
       dateStr,                                   // A: Date
       customerNum,                               // B: CustomerNum
@@ -112,17 +113,32 @@ function checkIn(data) {
       data.returningCustomer ? 'Yes' : 'No',     // M: ReturningCustomer
       '',                                        // N: ReDemoAfterBilling
       waitStartTime,                             // O: WaitStartTime
-      ''                                         // P: WaitMinutes
+      '',                                        // P: WaitMinutes
+      data.originalRowId ? String(data.originalRowId) : ''  // Q: OriginalRowId
     ]);
 
     const rowId = sheet.getLastRow();
     lock.releaseLock();
 
+    // If this is a re-demo, update the original visit's ReDemoAfterBilling field
+    // to mark it as "Re-demoed as Customer N on <date>"
+    if (data.originalRowId) {
+      try {
+        const originalRowId = parseInt(data.originalRowId);
+        const reDemoStatus = 'Yes - Re-demoed as Customer ' + customerNum + ' on ' + dateStr;
+        sheet.getRange(originalRowId, 14).setValue(reDemoStatus);   // N: ReDemoAfterBilling
+        Logger.log('Re-demo link: original row ' + originalRowId + ' → new Customer ' + customerNum);
+      } catch (linkErr) {
+        Logger.log('Non-fatal: could not update original row re-demo status: ' + linkErr.toString());
+      }
+    }
+
     return jsonResponse({
       status: 'success',
       customerNum: customerNum,
       rowId: rowId,
-      waitStartTime: waitStartTime
+      waitStartTime: waitStartTime,
+      originalRowId: data.originalRowId || null
     });
   } catch (err) {
     lock.releaseLock();
@@ -350,7 +366,8 @@ function getActiveVisits() {
             elapsedMinutes: elapsed,
             returningCustomer: data[i][12],
             reDemo: data[i][13],
-            waitMinutes: data[i][15]
+            waitMinutes: data[i][15],
+            originalRowId: data[i][16]
           });
         } else if (waitStartTime && waitStartTime !== '') {
           // WAITING: checked in but demo not yet started
@@ -365,7 +382,8 @@ function getActiveVisits() {
             attachmentsDemoed: data[i][4],
             waitStartTime: waitStartTime,
             waitedMinutes: waited,
-            returningCustomer: data[i][12]
+            returningCustomer: data[i][12],
+            originalRowId: data[i][16]
           });
         }
       }
@@ -547,7 +565,8 @@ function getRecentVisits(limit) {
         returningCustomer: row[12],
         reDemo: row[13],
         waitStartTime: row[14],   // O: check-in time
-        waitMinutes: row[15]       // P: wait duration
+        waitMinutes: row[15],     // P: wait duration
+        originalRowId: row[16]   // Q: links to original visit (for re-demo)
       });
     }
     return jsonResponse({
@@ -793,7 +812,7 @@ function setupSheet() {
     const logHeaders = ['Date', 'CustomerNum', 'FromLocation', 'MachinesDemoed',
       'AttachmentsDemoed', 'StartTime', 'EndTime', 'DemoMinutes', 'Outcome',
       'OutcomeNotes', 'MachinesPurchased', 'AttachmentsPurchased',
-      'ReturningCustomer', 'ReDemoAfterBilling', 'WaitStartTime', 'WaitMinutes'];
+      'ReturningCustomer', 'ReDemoAfterBilling', 'WaitStartTime', 'WaitMinutes', 'OriginalRowId'];
     const logSheet = ensureTab(TABS.DEMO_LOG, logHeaders, logHeaders.length);
     for (let i = 1; i <= logHeaders.length; i++) logSheet.autoResizeColumn(i);
     Logger.log('[1] OK — DemoLog ready');

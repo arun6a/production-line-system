@@ -1460,7 +1460,7 @@ viewToggleBtn.addEventListener('click', () => {
     // Currently staff → switch to dashboard
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'viewDashboard'));
     viewToggleBtn.dataset.target = 'staff';
-    viewToggleBtn.textContent = '← Staff';
+    viewToggleBtn.textContent = 'Back';
     // Hide staff FAB on dashboard view
     $('checkinFab').style.display = 'none';
   } else {

@@ -450,21 +450,35 @@ function getTodaySummary() {
       }
     }
 
-    // Weekly (last 7 days) and monthly stats
-    // ('now' is already declared above at the top of getTodaySummary)
-    const weekAgo = new Date(now);
-    weekAgo.setDate(now.getDate() - 6);  // 7 days including today
-    const weekAgoStr = formatDate(weekAgo);
+    // Weekly counter: Monday to Saturday of CURRENT week (Sunday rolls back to last Mon-Sat).
+    // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
+    // Monthly counter: visits from 1st of current calendar month to today.
+    const dow = now.getDay();
+    let weekStart, weekEnd;
+    if (dow === 0) {
+      // Sunday — show last Monday to last Saturday (i.e., the just-finished week)
+      weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);   // last Monday
+      weekEnd = new Date(now);
+      weekEnd.setDate(now.getDate() - 1);     // last Saturday
+    } else {
+      // Monday–Saturday — weekStart = Monday of this week, weekEnd = today (cap)
+      weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (dow - 1));  // Monday
+      weekEnd = new Date(now);                       // today (don't count future days)
+    }
+    const weekStartStr = formatDate(weekStart);
+    const weekEndStr = formatDate(weekEnd);
     const monthPrefix = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
     let weeklyVisits = 0, weeklyPurchased = 0, monthlyVisits = 0, monthlyPurchased = 0;
     for (let i = 1; i < data.length; i++) {
       const rowDate = formatDate(data[i][0]);
-      if (rowDate >= weekAgoStr && rowDate <= today) {
+      if (rowDate >= weekStartStr && rowDate <= weekEndStr) {
         weeklyVisits++;
         if ((data[i][8] || '').toLowerCase() === 'purchased') weeklyPurchased++;
       }
-      if (rowDate.substring(0, 7) === monthPrefix) {
+      if (rowDate.substring(0, 7) === monthPrefix && rowDate <= today) {
         monthlyVisits++;
         if ((data[i][8] || '').toLowerCase() === 'purchased') monthlyPurchased++;
       }

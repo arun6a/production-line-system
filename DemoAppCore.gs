@@ -20,8 +20,27 @@ const TABS = {
   DEMO_LOG: 'DemoLog',
   ATTACHMENTS: 'AttachmentRegistry',
   MACHINES: 'MachineList',
-  DAILY_NOTES: 'DailyNotes'
+  DAILY_NOTES: 'DailyNotes',
+  FCM_TOKENS: 'FCMTokens'
 };
+
+// ==================== FCM (Firebase Cloud Messaging) ====================
+// Firebase credentials stored in Script Properties (NOT in code, for security).
+// Apps Script editor -> Project Settings (gear icon) -> Script Properties -> Add:
+//   FIREBASE_PROJECT_ID    = km-demo-tracker
+//   FIREBASE_CLIENT_EMAIL  = firebase-adminsdk-fbsvc@km-demo-tracker.iam.gserviceaccount.com
+//   FIREBASE_PRIVATE_KEY   = <paste the entire private_key value from the service-account JSON, including the PEM BEGIN/END markers and \n newlines>
+//
+// To get the JSON: Firebase console -> Project Settings -> Service Accounts -> Generate new private key.
+// The downloaded JSON's private_key field has the un-redacted key (with real PEM markers).
+function getFirebaseConfig() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    PROJECT_ID: props.getProperty('FIREBASE_PROJECT_ID') || 'km-demo-tracker',
+    CLIENT_EMAIL: props.getProperty('FIREBASE_CLIENT_EMAIL') || '',
+    PRIVATE_KEY: props.getProperty('FIREBASE_PRIVATE_KEY') || ''
+  };
+}
 
 // ==================== ROUTER ====================
 
@@ -58,6 +77,8 @@ function doPost(e) {
     case 'addattachment': return addAttachment(bodyData);
     case 'savedailynotes': return saveDailyNotes(bodyData);
     case 'updateredoemo': return updateReDemo(bodyData);
+    case 'registerfcmtoken': return registerFCMToken(bodyData);
+    case 'unregisterfcmtoken': return unregisterFCMToken(bodyData);
     default: return textResponse('Error: Unknown action: ' + action);
   }
 }
@@ -131,6 +152,27 @@ function checkIn(data) {
       } catch (linkErr) {
         Logger.log('Non-fatal: could not update original row re-demo status: ' + linkErr.toString());
       }
+    }
+
+    // Send FCM notification: "Customer N checked in (Loc). X in waiting. Y customer demo running."
+    try {
+      // Compute current waiting + active counts for today
+      const allData2 = sheet.getDataRange().getValues();
+      let waitCount = 0, activeCount = 0;
+      for (let i = 1; i < allData2.length; i++) {
+        if (formatDate(allData2[i][0]) !== dateStr) continue;
+        const st = allData2[i][5];        // F: StartTime (demo start)
+        const wt = allData2[i][14];       // O: WaitStartTime
+        const et = allData2[i][6];        // G: EndTime
+        if ((!et || et === '') && st && st !== '') activeCount++;
+        else if ((!et || et === '') && wt && wt !== '') waitCount++;
+      }
+      const locStr = data.fromLocation ? `(${data.fromLocation})` : '';
+      const title = `Customer ${customerNum} checked in`;
+      const body = `Customer ${customerNum} checked in ${locStr}. ${waitCount} in waiting. ${activeCount} customer demo running.`;
+      sendFCMNotification(title, body, { type: 'checkin', customerNum: customerNum });
+    } catch (fcmErr) {
+      Logger.log('FCM notification failed (non-fatal): ' + fcmErr.toString());
     }
 
     return jsonResponse({
@@ -244,6 +286,16 @@ function checkOut(data) {
       sheet.getRange(rowId, 5).setValue(merged.join(', '));
     }
 
+    // Send FCM notification: "Customer N complete demo, need to talk to owner and billing"
+    try {
+      const custNum = sheet.getRange(rowId, 2).getValue();
+      const title = `Customer ${custNum} complete demo`;
+      const body = `Customer ${custNum} complete demo, need to talk to owner and billing. (${fmtElapsed(demoMinutes)} demo)`;
+      sendFCMNotification(title, body, { type: 'checkout', customerNum: custNum });
+    } catch (fcmErr) {
+      Logger.log('FCM checkout notification failed (non-fatal): ' + fcmErr.toString());
+    }
+
     return jsonResponse({
       status: 'success',
       demoMinutes: demoMinutes
@@ -251,6 +303,13 @@ function checkOut(data) {
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
+}
+
+// Helper for formatting minutes as "Xm" or "Xh Ym"
+function fmtElapsed(min) {
+  if (min < 60) return min + 'm';
+  const h = Math.floor(min/60), m = min%60;
+  return h + 'h' + (m > 0 ? ' ' + m + 'm' : '');
 }
 
 // ==================== UPDATE VISIT (edit from dashboard) ====================
@@ -865,6 +924,18 @@ function setupSheet() {
     throw e;
   }
 
+  // ---- Step 4b: FCMTokens (for push notifications) ----
+  try {
+    Logger.log('[4b] Setting up FCMTokens...');
+    const fcmHeaders = ['device_id', 'fcm_token', 'registered_at', 'last_seen_at', 'device_name', 'platform', 'status'];
+    const fcmSheet = ensureTab(TABS.FCM_TOKENS, fcmHeaders, fcmHeaders.length);
+    for (let i = 1; i <= fcmHeaders.length; i++) fcmSheet.autoResizeColumn(i);
+    Logger.log('[4b] OK — FCMTokens ready');
+  } catch (e) {
+    Logger.log('[4b] FAILED — FCMTokens: ' + e.toString());
+    throw e;
+  }
+
   // ---- Step 5: optionally remove the default empty "Sheet1" ----
   // SAFE: only delete if Sheet1 exists, is empty, AND is NOT the only sheet
   // AND is NOT the active sheet (Google rejects deleting the active sheet).
@@ -929,4 +1000,229 @@ function jsonResponse(obj) {
 
 function textResponse(text) {
   return ContentService.createTextOutput(text);
+}
+
+// ==================== FCM REGISTRATION ====================
+
+function registerFCMToken(data) {
+  try {
+    if (!data.deviceId || !data.fcmToken) {
+      return jsonResponse({ status: 'error', message: 'Missing deviceId or fcmToken' });
+    }
+    const sheet = getSheet(TABS.FCM_TOKENS);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'FCMTokens sheet not found' });
+
+    const nowStr = new Date().toISOString();
+    const allData = sheet.getDataRange().getValues();
+
+    // Check if device_id already exists
+    let existingRow = -1;
+    let existingToken = '';
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][0] === data.deviceId) {
+        existingRow = i + 1;
+        existingToken = allData[i][1] || '';
+        break;
+      }
+    }
+
+    if (existingRow > 0) {
+      // Update existing row (also check if token changed)
+      sheet.getRange(existingRow, 2).setValue(data.fcmToken);            // B: fcm_token
+      sheet.getRange(existingRow, 3).setValue(nowStr);                    // C: registered_at
+      sheet.getRange(existingRow, 4).setValue(nowStr);                    // D: last_seen_at
+      sheet.getRange(existingRow, 5).setValue(data.deviceName || '');    // E: device_name
+      sheet.getRange(existingRow, 6).setValue(data.platform || '');     // F: platform
+      sheet.getRange(existingRow, 7).setValue('active');                 // G: status
+      Logger.log('FCM: Updated existing device row ' + existingRow + ' (token ' + (existingToken === data.fcmToken ? 'unchanged' : 'CHANGED') + ')');
+      return jsonResponse({ status: 'success', action: 'updated', tokenChanged: existingToken !== data.fcmToken });
+    } else {
+      // Insert new row
+      sheet.appendRow([
+        data.deviceId,         // A
+        data.fcmToken,         // B
+        nowStr,                // C: registered_at
+        nowStr,                // D: last_seen_at
+        data.deviceName || '', // E
+        data.platform || '',  // F
+        'active'               // G
+      ]);
+      Logger.log('FCM: Registered new device ' + data.deviceId);
+      return jsonResponse({ status: 'success', action: 'created' });
+    }
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+function unregisterFCMToken(data) {
+  try {
+    if (!data.deviceId) return jsonResponse({ status: 'error', message: 'Missing deviceId' });
+    const sheet = getSheet(TABS.FCM_TOKENS);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'FCMTokens sheet not found' });
+    const allData = sheet.getDataRange().getValues();
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][0] === data.deviceId) {
+        sheet.getRange(i + 1, 7).setValue('unregistered');  // G: status
+        sheet.getRange(i + 1, 4).setValue(new Date().toISOString());  // D: last_seen_at
+        return jsonResponse({ status: 'success' });
+      }
+    }
+    return jsonResponse({ status: 'error', message: 'Device not found' });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+// ==================== FCM NOTIFICATION SENDING ====================
+// Uses FCM HTTP v1 API with OAuth2 JWT (service account) auth.
+
+function getAllFCMTokens() {
+  const sheet = getSheet(TABS.FCM_TOKENS);
+  if (!sheet) return [];
+  const allData = sheet.getDataRange().getValues();
+  const tokens = [];
+  for (let i = 1; i < allData.length; i++) {
+    const status = allData[i][6] || 'active';
+    if (status === 'active' && allData[i][1]) {
+      tokens.push({
+        deviceId: allData[i][0],
+        token: allData[i][1],
+        rowIdx: i + 1
+      });
+    }
+  }
+  return tokens;
+}
+
+// Get OAuth2 access token by signing a JWT with the Firebase service account private key
+function getFCMAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: getFirebaseConfig().CLIENT_EMAIL,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600
+  };
+
+  const encHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=+$/, '');
+  const encPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
+  const toSign = encHeader + '.' + encPayload;
+
+  // Sign with RSA-SHA256 using the private key
+  const signature = Utilities.computeRsaSha256Signature(toSign, getFirebaseConfig().PRIVATE_KEY.replace(/\\n/g, '\n'));
+  const encSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
+
+  const jwt = toSign + '.' + encSignature;
+
+  // Exchange JWT for access token
+  const tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: {
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt
+    },
+    muteHttpExceptions: true
+  });
+  const tokenJson = JSON.parse(tokenResp.getContentText());
+  if (!tokenJson.access_token) {
+    throw new Error('Failed to get FCM access token: ' + tokenResp.getContentText());
+  }
+  return tokenJson.access_token;
+}
+
+// Send FCM push notification to ALL registered devices
+function sendFCMNotification(title, body, data) {
+  try {
+    const tokens = getAllFCMTokens();
+    if (tokens.length === 0) {
+      Logger.log('FCM: No registered devices, skipping notification');
+      return;
+    }
+    const accessToken = getFCMAccessToken();
+    const projectId = getFirebaseConfig().PROJECT_ID;
+    const url = 'https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send';
+
+    let sentCount = 0, failCount = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      const message = {
+        message: {
+          token: t.token,
+          notification: { title: title, body: body },
+          data: (function() {
+            const d = {};
+            if (data) for (const k in data) d[k] = String(data[k]);
+            return d;
+          })(),
+          android: {
+            priority: 'high',
+            notification: { channel_id: 'km_demo_default', sound: 'default' }
+          }
+        }
+      };
+      try {
+        const resp = UrlFetchApp.fetch(url, {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { Authorization: 'Bearer ' + accessToken },
+          payload: JSON.stringify(message),
+          muteHttpExceptions: true
+        });
+        if (resp.getResponseCode() === 200) {
+          sentCount++;
+        } else {
+          // 404 = token not registered (unregister on server)
+          if (resp.getResponseCode() === 404 || resp.getContentText().indexOf('UNREGISTERED') >= 0) {
+            const fcmSheet = getSheet(TABS.FCM_TOKENS);
+            if (fcmSheet) fcmSheet.getRange(t.rowIdx, 7).setValue('unregistered');
+          }
+          Logger.log('FCM send failed for device ' + t.deviceId + ': ' + resp.getContentText());
+          failCount++;
+        }
+      } catch (e) {
+        failCount++;
+        Logger.log('FCM send error for device ' + t.deviceId + ': ' + e.toString());
+      }
+    }
+    Logger.log('FCM: sent=' + sentCount + ' failed=' + failCount + ' total=' + tokens.length);
+  } catch (e) {
+    Logger.log('sendFCMNotification error: ' + e.toString());
+  }
+}
+
+// ==================== DAILY 7PM SUMMARY (time-driven trigger) ====================
+// Set up trigger: Apps Script editor → Triggers → Add Trigger
+//   Function: sendDailySummary
+//   Event source: Time-driven
+//   Type: Day timer
+//   Time of day: 7pm to 8pm
+
+function sendDailySummary() {
+  try {
+    const sheet = getSheet(TABS.DEMO_LOG);
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    const today = formatDate(new Date());
+    let visitedCount = 0;
+    let purchasedCount = 0;
+    let totalDemoMin = 0;
+    for (let i = 1; i < data.length; i++) {
+      if (formatDate(data[i][0]) !== today) continue;
+      visitedCount++;
+      const demoMin = parseInt(data[i][7]) || 0;
+      totalDemoMin += demoMin;
+      if ((data[i][8] || '').toLowerCase() === 'purchased') purchasedCount++;
+    }
+    const title = 'Daily Summary — ' + visitedCount + ' customer' + (visitedCount === 1 ? '' : 's') + ' visited';
+    const body = visitedCount + ' customer' + (visitedCount === 1 ? '' : 's') + ' visited today. ' +
+      purchasedCount + ' purchased. Total demo time: ' + fmtElapsed(totalDemoMin) + '.';
+    sendFCMNotification(title, body, { type: 'daily_summary', date: today });
+    Logger.log('Daily summary sent: ' + title + ' — ' + body);
+  } catch (e) {
+    Logger.log('sendDailySummary error: ' + e.toString());
+  }
 }
